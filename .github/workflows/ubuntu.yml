@@ -1,0 +1,115 @@
+name: Ubuntu
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  gcc_build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Install gcc
+        run: |
+          sudo apt update
+          sudo apt install gcc-11 g++-11
+        shell: bash
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install libsodium-dev libprotobuf-dev ninja-build protobuf-compiler libgrpc++-dev protobuf-compiler-grpc
+        shell: bash
+
+      - name: Create Build Environment
+        run: cmake -E make_directory ${{github.workspace}}/build
+
+      - name: Download OpenFHE
+        uses: actions/checkout@v2
+        with:
+          repository: openfheorg/openfhe-development
+          ref: v0.9.4
+          path: ${{github.workspace}}/external/openfhe
+
+      - name: Install OpenFHE
+        working-directory: ${{github.workspace}}/external/openfhe
+        run: |
+          mkdir build
+          cd build
+          cmake -DBUILD_UNITTESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BENCHMARKS=OFF -DBUILD_EXTRAS=OFF .. 
+          make
+          sudo make install
+
+      - name: Configure CMake
+        working-directory: ${{github.workspace}}/build
+        run: cmake -GNinja $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=Release
+        env:
+          CC:   gcc-11
+          CXX:  g++-11
+
+      - name: Build
+        working-directory: ${{github.workspace}}/build
+        run: cmake --build . --config Release
+
+      - name: Test
+        working-directory: ${{github.workspace}}/build
+        run: ctest -C Release
+
+  clang_build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Install clang
+        run: |
+          sudo apt update
+          sudo apt install clang-13
+        shell: bash
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install libsodium-dev libprotobuf-dev ninja-build protobuf-compiler libgrpc++-dev protobuf-compiler-grpc
+        shell: bash
+
+      - name: Create Build Environment
+        run: cmake -E make_directory ${{github.workspace}}/build
+
+      - name: Download OpenFHE
+        uses: actions/checkout@v2
+        with:
+          repository: openfheorg/openfhe-development
+          ref: v0.9.4
+          path: ${{github.workspace}}/external/openfhe
+
+      - name: Install OpenFHE
+        working-directory: ${{github.workspace}}/external/openfhe
+        run: |
+          mkdir build
+          cd build
+          cmake -DBUILD_UNITTESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BENCHMARKS=OFF -DBUILD_EXTRAS=OFF .. 
+          make
+          sudo make install     
+
+      - name: Configure CMake
+        working-directory: ${{github.workspace}}/build
+        run: cmake -GNinja $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=Release
+        env:
+          CC:   clang-13
+          CXX:  clang++-13
+
+      - name: Build
+        working-directory: ${{github.workspace}}/build
+        run: cmake --build . --config Release
+
+      - name: Test
+        working-directory: ${{github.workspace}}/build
+        run: ctest -C Release

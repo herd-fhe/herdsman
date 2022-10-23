@@ -1,0 +1,6 @@
+---
+server:
+  port: 5000
+
+security:
+  secret_key: "Nzc4MzM0ZjU0MmEwYmQ2MGM2OTA1ZjFjNDg1YTMxODk"

@@ -1,0 +1,69 @@
+name: "CodeQL scan"
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  CodeQL-build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          fetch-depth: 2
+
+      - run: git checkout HEAD^2
+        if: ${{ github.event_name == 'pull_request' }}
+
+      - name: Install gcc
+        run: |
+          sudo apt update
+          sudo apt install gcc-11 g++-11
+        shell: bash
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install libsodium-dev libprotobuf-dev ninja-build protobuf-compiler libgrpc++-dev protobuf-compiler-grpc
+        shell: bash
+
+      - name: Download OpenFHE
+        uses: actions/checkout@v2
+        with:
+          repository: openfheorg/openfhe-development
+          ref: v0.9.4
+          path: ${{github.workspace}}/external/openfhe
+
+      - name: Install OpenFHE
+        working-directory: ${{github.workspace}}/external/openfhe
+        run: |
+          mkdir build
+          cd build
+          cmake -DBUILD_UNITTESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BENCHMARKS=OFF -DBUILD_EXTRAS=OFF .. 
+          make
+          sudo make install
+
+      - name: Create Build Environment
+        run: cmake -E make_directory ${{github.workspace}}/build
+
+      - name: Configure CMake
+        working-directory: ${{github.workspace}}/build
+        run: cmake -GNinja $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=Release
+        env:
+          CC:   gcc-11
+          CXX:  g++-11
+
+      - name: CodeQL init
+        uses: github/codeql-action/init@v1
+
+      - name: Build
+        working-directory: ${{github.workspace}}/build
+        run: cmake --build . --config Release
+
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/analyze@v1
