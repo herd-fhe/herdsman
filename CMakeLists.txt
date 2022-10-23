@@ -88,6 +88,7 @@ add_subdirectory(third-party/yaml-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(third-party/spdlog EXCLUDE_FROM_ALL)
 
 find_package(Threads REQUIRED)
+find_package(OpenMP REQUIRED)
 
 # Targets
 ## Herd - proto
@@ -164,6 +165,7 @@ target_link_libraries(
 
         OPENFHEcore
         OPENFHEbinfhe
+        OpenMP::OpenMP_CXX
 
         ${SODIUM_LIBRARIES}
         ${UUID_LIBRARIES}
@@ -189,6 +191,10 @@ target_include_directories(
         ${UUID_INCLUDE_DIRS}
         third-party/libpaseto/include
 )
+
+# Hack for yaml-cpp
+get_target_property(YAML_INCLUDE yaml-cpp::yaml-cpp INTERFACE_INCLUDE_DIRECTORIES)
+target_include_directories(herdsman SYSTEM PRIVATE ${YAML_INCLUDE})
 
 add_dependencies(herdsman herdsman-config)
 

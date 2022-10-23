@@ -23,27 +23,40 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install libsodium-dev libprotobuf-dev ninja-build protobuf-compiler libgrpc++-dev protobuf-compiler-grpc
+          sudo apt install libomp-dev libsodium-dev libprotobuf-dev ninja-build protobuf-compiler libgrpc++-dev protobuf-compiler-grpc
         shell: bash
 
       - name: Create Build Environment
         run: cmake -E make_directory ${{github.workspace}}/build
 
+      - name: Cache OpenFHE build
+        id: openfhe-build
+        uses: actions/cache@v3
+        with:
+          path: ${{github.workspace}}/external/openfhe/
+          key: openfhe-v0.9.4
+
       - name: Download OpenFHE
+        if: steps.openfhe-build.outputs.cache-hit != 'true'
         uses: actions/checkout@v2
         with:
           repository: openfheorg/openfhe-development
           ref: v0.9.4
           path: ${{github.workspace}}/external/openfhe
 
-      - name: Install OpenFHE
+      - name: Build OpenFHE
+        if: steps.openfhe-build.outputs.cache-hit != 'true'
         working-directory: ${{github.workspace}}/external/openfhe
         run: |
-          mkdir build
+          mkdir build -p
           cd build
           cmake -DBUILD_UNITTESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BENCHMARKS=OFF -DBUILD_EXTRAS=OFF .. 
           make
-          sudo make install
+
+      - name: Install OpenFHE
+        working-directory: ${{github.workspace}}/external/openfhe/build
+        run: |
+          sudo make install     
 
       - name: Configure CMake
         working-directory: ${{github.workspace}}/build
@@ -62,7 +75,6 @@ jobs:
 
   clang_build:
     runs-on: ubuntu-22.04
-
     steps:
       - uses: actions/checkout@v2
         with:
@@ -77,26 +89,39 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install libsodium-dev libprotobuf-dev ninja-build protobuf-compiler libgrpc++-dev protobuf-compiler-grpc
+          sudo apt install libomp-13-dev libsodium-dev libprotobuf-dev ninja-build protobuf-compiler libgrpc++-dev protobuf-compiler-grpc
         shell: bash
 
       - name: Create Build Environment
         run: cmake -E make_directory ${{github.workspace}}/build
 
+      - name: Cache OpenFHE build
+        id: openfhe-build
+        uses: actions/cache@v3
+        with:
+          path: ${{github.workspace}}/external/openfhe/
+          key: openfhe-v0.9.4
+
       - name: Download OpenFHE
+        if: steps.openfhe-build.outputs.cache-hit != 'true'
         uses: actions/checkout@v2
         with:
           repository: openfheorg/openfhe-development
           ref: v0.9.4
           path: ${{github.workspace}}/external/openfhe
 
-      - name: Install OpenFHE
+      - name: Build OpenFHE
+        if: steps.openfhe-build.outputs.cache-hit != 'true'
         working-directory: ${{github.workspace}}/external/openfhe
         run: |
-          mkdir build
+          mkdir build -p
           cd build
           cmake -DBUILD_UNITTESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BENCHMARKS=OFF -DBUILD_EXTRAS=OFF .. 
           make
+
+      - name: Install OpenFHE
+        working-directory: ${{github.workspace}}/external/openfhe/build
+        run: |
           sudo make install     
 
       - name: Configure CMake
