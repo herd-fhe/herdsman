@@ -3,16 +3,21 @@
 #include <fstream>
 
 
+struct FileReadError: public std::runtime_error
+{
+	using std::runtime_error::runtime_error;
+};
+
 std::string read_file(const std::filesystem::path &filepath)
 {
 	if(!std::filesystem::exists(filepath))
 	{
-		throw std::runtime_error("File " + filepath.string() + " not found");
+		throw FileReadError("File " + filepath.string() + " not found");
 	}
 
 	if(!std::filesystem::is_regular_file(filepath))
 	{
-		throw std::runtime_error(filepath.string() + "is not a regular file");
+		throw FileReadError(filepath.string() + "is not a regular file");
 	}
 
 	const auto file_size = std::filesystem::file_size(filepath);
@@ -26,9 +31,9 @@ std::string read_file(const std::filesystem::path &filepath)
 	{
 		string_data.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
 	}
-	catch(const std::ios_base::failure& fail)
+	catch(const std::ios_base::failure&)
 	{
-		throw std::runtime_error("Failed to read data from file");
+		throw FileReadError("Failed to read data from file");
 	}
 
 	return string_data;

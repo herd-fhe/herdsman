@@ -3,20 +3,19 @@
 
 #include <stdexcept>
 
-
 struct InvalidIdentifierException: public std::runtime_error
 {
-	explicit InvalidIdentifierException(const std::string& arg): std::runtime_error(arg) {};
+	using std::runtime_error::runtime_error;
 };
 
 struct ObjectAlreadyExistsException: public std::runtime_error
 {
-	explicit ObjectAlreadyExistsException(const std::string& arg): std::runtime_error(arg) {};
+	using std::runtime_error::runtime_error;
 };
 
 struct ObjectNotFoundException: public std::runtime_error
 {
-	explicit ObjectNotFoundException(const std::string& arg): std::runtime_error(arg) {};
+	using std::runtime_error::runtime_error;
 };
 
 

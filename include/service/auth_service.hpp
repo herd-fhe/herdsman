@@ -35,9 +35,9 @@ public:
 
 	static const char* const footer;
 
-	explicit AuthService(paseto_key_type key, std::chrono::seconds token_lifetime);
+	explicit AuthService(const paseto_key_type& key, std::chrono::seconds token_lifetime);
 
-	[[nodiscard]] std::optional<std::string> authenticate(const std::string& authentication_token) const;
+	[[nodiscard]] std::optional<std::string> authenticate(std::string_view authentication_token) const;
 	[[nodiscard]] AuthToken load_token(const std::string& connection_token) const;
 	[[nodiscard]] bool is_auth_token_valid(
 			const AuthToken& auth_token,
