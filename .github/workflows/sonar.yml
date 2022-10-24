@@ -1,0 +1,106 @@
+name: "Sonar scan"
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  sonar-scan:
+    runs-on: ubuntu-22.04
+    env:
+      SONAR_SCANNER_VERSION: 4.7.0.2747
+      SONAR_SERVER_URL: "https://sonarcloud.io"
+      BUILD_WRAPPER_OUT_DIR: ${{github.workspace}}/build_wrapper_output_directory
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          fetch-depth: 2
+
+      - run: git checkout HEAD^2
+        if: ${{ github.event_name == 'pull_request' }}
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Download and set up sonar-scanner
+        env:
+          SONAR_SCANNER_DOWNLOAD_URL: https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${{ env.SONAR_SCANNER_VERSION }}-linux.zip
+        run: |
+          mkdir -p $HOME/.sonar
+          curl -sSLo $HOME/.sonar/sonar-scanner.zip ${{ env.SONAR_SCANNER_DOWNLOAD_URL }}
+          unzip -o $HOME/.sonar/sonar-scanner.zip -d $HOME/.sonar/
+          echo "$HOME/.sonar/sonar-scanner-${{ env.SONAR_SCANNER_VERSION }}-linux/bin" >> $GITHUB_PATH
+      - name: Download and set up build-wrapper
+        env:
+          BUILD_WRAPPER_DOWNLOAD_URL: ${{ env.SONAR_SERVER_URL }}/static/cpp/build-wrapper-linux-x86.zip
+        run: |
+          curl -sSLo $HOME/.sonar/build-wrapper-linux-x86.zip ${{ env.BUILD_WRAPPER_DOWNLOAD_URL }}
+          unzip -o $HOME/.sonar/build-wrapper-linux-x86.zip -d $HOME/.sonar/
+          echo "$HOME/.sonar/build-wrapper-linux-x86" >> $GITHUB_PATH
+
+      - name: Install gcc
+        run: |
+          sudo apt update
+          sudo apt install gcc-11 g++-11
+        shell: bash
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install libomp-dev libsodium-dev libprotobuf-dev ninja-build protobuf-compiler libgrpc++-dev protobuf-compiler-grpc
+        shell: bash
+
+      - name: Cache OpenFHE build
+        id: openfhe-build
+        uses: actions/cache@v3
+        with:
+          path: ${{github.workspace}}/external/openfhe/
+          key: openfhe-v0.9.4
+
+      - name: Download OpenFHE
+        if: steps.openfhe-build.outputs.cache-hit != 'true'
+        uses: actions/checkout@v2
+        with:
+          repository: openfheorg/openfhe-development
+          ref: v0.9.4
+          path: ${{github.workspace}}/external/openfhe
+
+      - name: Build OpenFHE
+        if: steps.openfhe-build.outputs.cache-hit != 'true'
+        working-directory: ${{github.workspace}}/external/openfhe
+        run: |
+          mkdir build -p
+          cd build
+          cmake -DBUILD_UNITTESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BENCHMARKS=OFF -DBUILD_EXTRAS=OFF .. 
+          make
+
+      - name: Install OpenFHE
+        working-directory: ${{github.workspace}}/external/openfhe/build
+        run: |
+          sudo make install     
+
+      - name: Create Build Environment
+        run: cmake -E make_directory ${{github.workspace}}/build
+
+      - name: Configure CMake
+        working-directory: ${{github.workspace}}/build
+        run: cmake -GNinja $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=Release
+        env:
+          CC:   gcc-11
+          CXX:  g++-11
+
+      - name: Build
+        working-directory: ${{github.workspace}}/build
+        run: build-wrapper-linux-x86-64 --out-dir ${{ env.BUILD_WRAPPER_OUT_DIR }} cmake --build . --config Release
+
+      - name: Run sonar-scanner
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          sonar-scanner --define sonar.host.url="${{ env.SONAR_SERVER_URL }}" --define sonar.cfamily.build-wrapper-output="${{ env.BUILD_WRAPPER_OUT_DIR }}"
