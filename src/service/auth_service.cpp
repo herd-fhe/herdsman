@@ -12,11 +12,11 @@ std::array<uint8_t, 16> AuthService::AuthToken::to_binarray() const
 {
 	std::array<uint8_t, 16> binarray{};
 
-	memcpy(binarray.data(), reinterpret_cast<const uint8_t*>(&user_id), sizeof(user_id));
+	memcpy(binarray.data(), reinterpret_cast<const std::byte*>(&user_id), sizeof(user_id));
 	const auto session_start_from_epoch = session_start_time.time_since_epoch();
 	const auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(session_start_from_epoch).count();
 
-	memcpy(binarray.data() + sizeof(user_id), reinterpret_cast<const uint8_t*>(&timestamp), sizeof(timestamp));
+	memcpy(binarray.data() + sizeof(user_id), reinterpret_cast<const std::byte*>(&timestamp), sizeof(timestamp));
 
 	return binarray;
 }
@@ -25,10 +25,10 @@ AuthService::AuthToken AuthService::AuthToken::from_binarray(const std::array<ui
 {
 	AuthToken token{};
 
-	memcpy(reinterpret_cast<uint8_t*>(token.user_id), bin_token.data(), sizeof(user_id));
+	memcpy(reinterpret_cast<std::byte*>(&token.user_id), bin_token.data(), sizeof(user_id));
 
 	int64_t timestamp;
-	memcpy(reinterpret_cast<uint8_t*>(&timestamp), bin_token.data() + sizeof(user_id), sizeof(timestamp));
+	memcpy(reinterpret_cast<std::byte*>(&timestamp), bin_token.data() + sizeof(user_id), sizeof(timestamp));
 
 	std::chrono::seconds seconds_from_epoch(timestamp);
 	std::chrono::time_point<std::chrono::system_clock> session_start_time{seconds_from_epoch};
@@ -37,12 +37,12 @@ AuthService::AuthToken AuthService::AuthToken::from_binarray(const std::array<ui
 	return token;
 }
 
-AuthService::AuthService(paseto_key_type key, std::chrono::seconds token_lifetime)
+AuthService::AuthService(const paseto_key_type& key, std::chrono::seconds token_lifetime)
 	:key_(key), token_lifetime_(token_lifetime)
 {
 }
 
-std::optional<std::string> AuthService::authenticate(const std::string& authentication_token) const
+std::optional<std::string> AuthService::authenticate(std::string_view authentication_token) const
 {
 	const auto session_start = std::chrono::system_clock::now();
 
@@ -54,7 +54,7 @@ std::optional<std::string> AuthService::authenticate(const std::string& authenti
 				token_binarray.data(),
 				token_binarray.size(),
 				key_.data(),
-				reinterpret_cast<const uint8_t *>(AuthService::footer),
+				reinterpret_cast<const uint8_t*>(AuthService::footer),
 				std::strlen(AuthService::footer)
 		);
 

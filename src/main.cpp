@@ -38,7 +38,7 @@ std::shared_ptr<grpc::ServerCredentials> build_server_credentials(
 
 		grpc::SslServerCredentialsOptions::PemKeyCertPair key_cert = {key, cert};
 		options.pem_root_certs = ca_cert;
-		options.pem_key_cert_pairs.emplace_back(key_cert);
+		options.pem_key_cert_pairs.emplace_back(std::move(key_cert));
 
 		auto credentials = grpc::SslServerCredentials(options);
 		credentials->SetAuthMetadataProcessor(auth_metadata_processor);

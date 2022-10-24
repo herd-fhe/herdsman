@@ -33,7 +33,7 @@ grpc::Status SessionController::create_session(
 		*response->mutable_name() = request->name();
 		*response->mutable_uuid() = uuid.as_string();
 	}
-	catch(const ObjectAlreadyExistsException& error)
+	catch(const ObjectAlreadyExistsException&)
 	{
 		spdlog::info("Failed to create session for user {}. Session {} already exists", user_id, request->name());
 		return {StatusCode::ALREADY_EXISTS, "Session already exists"};
@@ -67,12 +67,12 @@ grpc::Status SessionController::destroy_session(
 		const UUID session_uuid(request->uuid());
 		session_service_.destroy_session_by_uuid(user_id, session_uuid);
 	}
-	catch(const ObjectNotFoundException& error)
+	catch(const ObjectNotFoundException&)
 	{
 		spdlog::info("Failed to delete session {} for user {}. Session does not exist", request->uuid(), user_id);
 		return {StatusCode::NOT_FOUND, "Session already exists"};
 	}
-	catch(const std::invalid_argument& error)
+	catch(const std::invalid_argument&)
 	{
 		spdlog::info("Failed to delete session for user {}. Invalid identifier", user_id);
 		return {StatusCode::INVALID_ARGUMENT, "Invalid session identifier"};
