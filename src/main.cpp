@@ -22,7 +22,7 @@ std::shared_ptr<grpc::ServerCredentials> build_server_credentials(
 		AuthService& auth_service
 )
 {
-	std::vector<std::string> path_not_secured = {"/herd.Auth/authorize_connection"};
+	std::vector<std::string> path_not_secured = {"/herd.proto.Auth/authorize_connection"};
 	const auto auth_metadata_processor = std::make_shared<TokenAuthMetadataProcessor>(auth_service, path_not_secured);
 
 	if (config.ssl_config)
@@ -60,7 +60,7 @@ int main()
 	const auto config = load_config("./herdsman.yaml");
 
 	const paseto_key_type paseto_key = init_paseto(config.security.secret_key);
-	const std::string address = "0.0.0.0:" + std::to_string(config.server.port);
+	const std::string address = config.server.address + ":" + std::to_string(config.server.port);
 
 	AuthService auth_service(paseto_key, std::chrono::seconds(config.security.token_lifetime));
 	SessionService session_service;

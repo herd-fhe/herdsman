@@ -10,6 +10,7 @@
 namespace
 {
 	constexpr const char* const BEARER_PREFIX = "Bearer";
+	constexpr const char* const PATH_KEY = ":path";
 }
 
 TokenAuthMetadataProcessor::TokenAuthMetadataProcessor(
@@ -29,6 +30,22 @@ grpc::Status TokenAuthMetadataProcessor::Process(
 	static_cast<void>(response_metadata);
 
 	using namespace grpc;
+
+	if(const auto path = auth_metadata.find(PATH_KEY); path != std::end(auth_metadata))
+	{
+		const bool matched = std::ranges::any_of(
+				paths_not_secured_,
+				[&path](const auto& open_path)
+				{
+					return open_path == path->second;
+				}
+        );
+
+		if(matched)
+		{
+			return Status::OK;
+		}
+	}
 
 	if(const auto token_metadata = auth_metadata.find(AUTH_TOKEN_KEY); token_metadata != std::end(auth_metadata))
 	{
@@ -65,5 +82,5 @@ grpc::Status TokenAuthMetadataProcessor::Process(
 		spdlog::info("Invalid auth token format");
 		return {StatusCode::UNAUTHENTICATED, "Invalid auth token format"};
 	}
-	return Status::OK;
+	return {StatusCode::UNAUTHENTICATED, "No token provided"};
 }

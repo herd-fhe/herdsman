@@ -6,27 +6,27 @@
 #include "service/session_service.hpp"
 
 
-class SessionController: public herd::Session::Service
+class SessionController: public herd::proto::Session::Service
 {
 public:
 	explicit SessionController(SessionService& session_service) noexcept;
 
 	grpc::Status create_session(
 			grpc::ServerContext *context,
-			const herd::SessionCreateRequest *request,
-            herd::SessionInfo *response
+			const herd::proto::SessionCreateRequest *request,
+            herd::proto::SessionInfo *response
 	) override;
 
 	grpc::Status destroy_session(
 			grpc::ServerContext *context,
-			const herd::SessionDestroyRequest *request,
+			const herd::proto::SessionDestroyRequest *request,
 			herd::Empty *response
 	) override;
 
 	grpc::Status list_sessions(
 			grpc::ServerContext *context,
 			const herd::Empty *request,
-	        herd::SessionInfoList *response
+	        herd::proto::SessionInfoList *response
 	) override;
 
 private:

@@ -14,8 +14,8 @@ SessionController::SessionController(SessionService& session_service) noexcept
 
 grpc::Status SessionController::create_session(
 		grpc::ServerContext* context,
-		const herd::SessionCreateRequest* request,
-		herd::SessionInfo* response)
+		const herd::proto::SessionCreateRequest* request,
+		herd::proto::SessionInfo* response)
 {
 	using namespace grpc;
 
@@ -49,7 +49,7 @@ grpc::Status SessionController::create_session(
 
 grpc::Status SessionController::destroy_session(
 		grpc::ServerContext* context,
-		const herd::SessionDestroyRequest* request,
+		const herd::proto::SessionDestroyRequest* request,
 		herd::Empty* response)
 {
 	using namespace grpc;
@@ -89,7 +89,7 @@ grpc::Status SessionController::destroy_session(
 grpc::Status SessionController::list_sessions(
 		grpc::ServerContext* context,
 		const herd::Empty* request,
-		herd::SessionInfoList* response)
+		herd::proto::SessionInfoList* response)
 {
 	static_cast<void>(request);
 

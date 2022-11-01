@@ -1,5 +1,6 @@
 ---
 server:
+  address: localhost
   port: 5000
 
 security:
