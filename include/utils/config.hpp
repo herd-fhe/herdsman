@@ -10,6 +10,7 @@ struct Config
 {
 	struct ServerConfig
 	{
+		std::string address;
 		uint16_t port{};
 	};
 

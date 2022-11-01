@@ -11,8 +11,8 @@ AuthController::AuthController(AuthService& auth_service) noexcept
 
 grpc::Status AuthController::authorize_connection(
 		grpc::ServerContext *context,
-		const herd::AuthenticationToken *request,
-		herd::ConnectionToken *response
+		const herd::proto::AuthenticationToken *request,
+		herd::proto::ConnectionToken *response
 )
 {
 	using namespace grpc;

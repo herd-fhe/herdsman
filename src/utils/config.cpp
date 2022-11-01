@@ -49,6 +49,7 @@ namespace
 	{
 		Config::ServerConfig server_config{};
 
+		server_config.address = get_optional_value<std::string>(node, "address", "0.0.0.0");
 		server_config.port = get_optional_value<uint16_t>(node, "port", 5000);
 
 		return server_config;
