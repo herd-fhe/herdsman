@@ -9,7 +9,7 @@
 class TokenAuthMetadataProcessor: public grpc::AuthMetadataProcessor
 {
 public:
-	constexpr static const char* const AUTH_TOKEN_KEY = "Authorization";
+	constexpr static const char* const AUTH_TOKEN_KEY = "authorization";
 	constexpr static const char* const PEER_IDENTITY_PROPERTY_NAME = "user_id";
 
 	TokenAuthMetadataProcessor(AuthService& auth_service, std::vector<std::string>  paths_not_secured);

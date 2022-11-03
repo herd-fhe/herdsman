@@ -52,6 +52,8 @@ grpc::Status SessionController::destroy_session(
 		const herd::proto::SessionDestroyRequest* request,
 		herd::Empty* response)
 {
+	static_cast<void>(response);
+
 	using namespace grpc;
 
 	const auto user_id = extract_user_id_from_context(context);
@@ -83,7 +85,7 @@ grpc::Status SessionController::destroy_session(
 		return {StatusCode::INTERNAL, INTERNAL_ERROR_MSG};
 	}
 
-	return Service::destroy_session(context, request, response);
+	return Status::OK;
 }
 
 grpc::Status SessionController::list_sessions(

@@ -14,8 +14,7 @@ requires std::input_iterator<InputIterator> && std::is_same_v<typename InputIter
 	assert(begin <= end);
 
 	std::string res;
-	res.reserve(static_cast<size_t>(std::distance(begin, end)));
-
+	res.resize(static_cast<size_t>(std::distance(begin, end)));
 	std::remove_copy_if(
 			begin, end, std::begin(res),
 			[&current_locale](auto character)

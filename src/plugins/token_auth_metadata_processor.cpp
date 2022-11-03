@@ -60,8 +60,23 @@ grpc::Status TokenAuthMetadataProcessor::Process(
 			{
 				if(const auto token = auth_service_.load_token(token_value); auth_service_.is_auth_token_valid(token))
 				{
-					context->AddProperty(PEER_IDENTITY_PROPERTY_NAME, std::to_string(token.user_id));
-					context->SetPeerIdentityPropertyName(PEER_IDENTITY_PROPERTY_NAME);
+					const auto user_id_str = std::to_string(token.user_id);
+
+					if(!context->FindPropertyValues(PEER_IDENTITY_PROPERTY_NAME).empty())
+					{
+						assert(context->GetPeerIdentity().size() == 1);
+						const auto connection_user_id = context->GetPeerIdentity();
+
+						if(user_id_str != connection_user_id.front())
+						{
+							return {StatusCode::UNAUTHENTICATED, "Connection already used by other user. Please open new connection to server"};
+						}
+					}
+					else
+					{
+						context->AddProperty(PEER_IDENTITY_PROPERTY_NAME, user_id_str);
+						context->SetPeerIdentityPropertyName(PEER_IDENTITY_PROPERTY_NAME);
+					}
 
 					consumed_auth_metadata->insert(std::make_pair(
 							string(token_metadata->first.data(), token_metadata->first.length()),
