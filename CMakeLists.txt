@@ -126,6 +126,8 @@ target_sources(
         src/service/session_service.cpp
         src/service/key_service.cpp
 
+        src/mapper/schema_type_mapper.cpp
+
         src/plugins/token_auth_metadata_processor.cpp
 
         include/utils/config.hpp
@@ -141,6 +143,8 @@ target_sources(
         include/service/auth_service.hpp
         include/service/session_service.hpp
         include/service/key_service.hpp
+
+        include/mapper/schema_type_mapper.hpp
 
         include/schema_type.hpp
 

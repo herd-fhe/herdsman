@@ -64,6 +64,7 @@ int main()
 
 	AuthService auth_service(paseto_key, std::chrono::seconds(config.security.token_lifetime));
 	SessionService session_service;
+	KeyService key_service;
 
 	const auto credentials = build_server_credentials(config.security, auth_service);
 
@@ -74,7 +75,7 @@ int main()
 	builder.RegisterService(&auth_controller);
 	spdlog::trace("Auth controller created");
 
-	SessionController session_controller(session_service);
+	SessionController session_controller(session_service, key_service);
 	builder.RegisterService(&session_controller);
 	spdlog::trace("Session controller created");
 
