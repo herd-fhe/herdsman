@@ -60,12 +60,6 @@ grpc::Status SessionController::destroy_session(
 
 	const auto user_id = extract_user_id_from_context(context);
 
-	if(request->uuid().empty())
-	{
-		spdlog::info("Failed to delete session for user {}. Empty identifier", user_id);
-		return {StatusCode::INVALID_ARGUMENT, "Empty session identifier"};
-	}
-
 	try
 	{
 		const UUID session_uuid(request->uuid());
@@ -145,12 +139,6 @@ grpc::Status SessionController::add_key(
 		return {StatusCode::INVALID_ARGUMENT, "Failed to receive key metadata"};
 	}
 
-	if(message.options().session_uuid().empty())
-	{
-		spdlog::info("Failed to remove session key for session {} user {}. Empty identifier", message.options().session_uuid(), user_id);
-		return {StatusCode::INVALID_ARGUMENT, "Empty session identifier"};
-	}
-
 	try
 	{
 		const auto type = mapper::to_model(message.options().type());
@@ -215,12 +203,6 @@ grpc::Status SessionController::remove_key(
 
 	const auto user_id = extract_user_id_from_context(context);
 
-	if(request->session_uuid().empty())
-	{
-		spdlog::info("Failed to remove session key for session {} user {}. Empty identifier", request->session_uuid(), user_id);
-		return {StatusCode::INVALID_ARGUMENT, "Empty session identifier"};
-	}
-
 	try
 	{
 		const UUID session_uuid(request->session_uuid());
@@ -259,12 +241,6 @@ grpc::Status SessionController::list_keys(
 	using namespace grpc;
 
 	const auto user_id = extract_user_id_from_context(context);
-
-	if(request->session_uuid().empty())
-	{
-		spdlog::info("Failed to list session keys for session {} user {}. Empty identifier", request->session_uuid(), user_id);
-		return {StatusCode::INVALID_ARGUMENT, "Empty session identifier"};
-	}
 
 	try
 	{

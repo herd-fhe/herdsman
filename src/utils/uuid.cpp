@@ -10,6 +10,11 @@ UUID::UUID()
 
 UUID::UUID(const std::string& uuid_string)
 {
+	if(uuid_string.empty())
+	{
+		throw std::invalid_argument("Invalid uuid");
+	}
+
 	const auto result = uuid_parse(uuid_string.c_str(), uuid_);
 	if(result != 0)
 	{
