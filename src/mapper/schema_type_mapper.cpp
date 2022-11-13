@@ -3,7 +3,6 @@
 
 namespace mapper
 {
-
 	SchemaType to_model(herd::proto::SchemaType type) noexcept
 	{
 		switch(type)

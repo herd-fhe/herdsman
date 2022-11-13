@@ -36,7 +36,7 @@ std::string read_file(const std::filesystem::path &filepath)
 
 void write_file(const std::filesystem::path& filepath, const std::vector<std::byte>& val)
 {
-	std::fstream file(filepath, std::ios_base::trunc | std::ios_base::binary);
+	std::fstream file(filepath, std::ios_base::out | std::ios_base::trunc | std::ios_base::binary);
 
 	file.write(reinterpret_cast<const char*>(val.data()), static_cast<long>(val.size()));
 	if(!file)
