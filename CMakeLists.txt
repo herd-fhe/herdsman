@@ -119,12 +119,14 @@ target_sources(
         src/utils/uuid.cpp
         src/utils/controller_utils.cpp
 
-
         src/controller/auth_controller.cpp
         src/controller/session_controller.cpp
 
         src/service/auth_service.cpp
         src/service/session_service.cpp
+        src/service/key_service.cpp
+
+        src/mapper/schema_type_mapper.cpp
 
         src/plugins/token_auth_metadata_processor.cpp
 
@@ -140,6 +142,12 @@ target_sources(
 
         include/service/auth_service.hpp
         include/service/session_service.hpp
+        include/service/key_service.hpp
+
+        include/mapper/schema_type_mapper.hpp
+
+        include/schema_type.hpp
+
         include/service/common_exceptions.hpp
 
         include/plugins/token_auth_metadata_processor.hpp

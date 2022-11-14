@@ -22,7 +22,7 @@ std::shared_ptr<grpc::ServerCredentials> build_server_credentials(
 		AuthService& auth_service
 )
 {
-	std::vector<std::string> path_not_secured = {"/herd.proto.Auth/authorize_connection"};
+	std::vector<std::string> path_not_secured = {std::string("/") + herd::proto::Auth::service_full_name() + "/authorize_connection"};
 	const auto auth_metadata_processor = std::make_shared<TokenAuthMetadataProcessor>(auth_service, path_not_secured);
 
 	if (config.ssl_config)
@@ -64,6 +64,7 @@ int main()
 
 	AuthService auth_service(paseto_key, std::chrono::seconds(config.security.token_lifetime));
 	SessionService session_service;
+	KeyService key_service;
 
 	const auto credentials = build_server_credentials(config.security, auth_service);
 
@@ -74,7 +75,7 @@ int main()
 	builder.RegisterService(&auth_controller);
 	spdlog::trace("Auth controller created");
 
-	SessionController session_controller(session_service);
+	SessionController session_controller(session_service, key_service);
 	builder.RegisterService(&session_controller);
 	spdlog::trace("Session controller created");
 

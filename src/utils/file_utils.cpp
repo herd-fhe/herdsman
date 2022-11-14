@@ -3,11 +3,6 @@
 #include <fstream>
 
 
-struct FileReadError: public std::runtime_error
-{
-	using std::runtime_error::runtime_error;
-};
-
 std::string read_file(const std::filesystem::path &filepath)
 {
 	if(!std::filesystem::exists(filepath))
@@ -37,4 +32,18 @@ std::string read_file(const std::filesystem::path &filepath)
 	}
 
 	return string_data;
+}
+
+void write_file(const std::filesystem::path& filepath, const std::vector<std::byte>& val)
+{
+	std::fstream file(filepath, std::ios_base::out | std::ios_base::trunc | std::ios_base::binary);
+
+	file.write(reinterpret_cast<const char*>(val.data()), static_cast<long>(val.size()));
+	if(!file)
+	{
+		file.close();
+		throw FileWriteError("Failed to write to file");
+	}
+
+	file.close();
 }

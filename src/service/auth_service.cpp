@@ -96,7 +96,7 @@ bool AuthService::is_auth_token_valid(
 		std::chrono::time_point<std::chrono::system_clock> point
 ) const noexcept
 {
-	return auth_token.session_start_time + token_lifetime_ < point;
+	return auth_token.session_start_time + token_lifetime_ > point;
 }
 
 uint64_t AuthService::user_id_from_string(const std::string& user_id_string) noexcept
@@ -104,7 +104,7 @@ uint64_t AuthService::user_id_from_string(const std::string& user_id_string) noe
 	std::size_t processed_size;
 	auto user_id = std::stoull(user_id_string, &processed_size);
 
-	assert(processed_size != user_id_string.size());
+	assert(processed_size == user_id_string.size());
 
 	return user_id;
 }
