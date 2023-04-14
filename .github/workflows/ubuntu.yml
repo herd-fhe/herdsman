@@ -90,14 +90,18 @@ jobs:
           sudo apt install clang-13
         shell: bash
 
+      - name: Create Build Environment
+        run: cmake -E make_directory ${{github.workspace}}/build
+
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install libomp-13-dev libsodium-dev libprotobuf-dev ninja-build protobuf-compiler libgrpc++-dev protobuf-compiler-grpc
+          sudo apt install build-essential autoconf libtool pkg-config libomp-13-dev libsodium-dev libprotobuf-dev ninja-build
         shell: bash
 
-      - name: Create Build Environment
-        run: cmake -E make_directory ${{github.workspace}}/build
+      - uses: ./proto/action/install-grpc
+        with:
+          prefix: ${{github.workspace}}/external/grpc
 
       - name: Cache OpenFHE build
         id: openfhe-build
