@@ -10,7 +10,7 @@
 class StorageController: public herd::proto::Storage::Service
 {
 public:
-	StorageController(StorageService& storage_service) noexcept;
+	explicit StorageController(StorageService& storage_service) noexcept;
 
 	grpc::Status add_data_frame(
 			grpc::ServerContext* context,
