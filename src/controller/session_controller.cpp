@@ -1,6 +1,6 @@
 #include "controller/session_controller.hpp"
 
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
 
 #include "mapper/schema_type_mapper.hpp"
 #include "utils/controller_utils.hpp"
@@ -159,6 +159,12 @@ grpc::Status SessionController::add_key(
 			}
 
 			const auto& blob = message.data().blob();
+
+			if(blob.empty())
+			{
+				spdlog::info("Empty packet received");
+				return {StatusCode::ABORTED, "Empty packet received"};
+			}
 
 			if(received + static_cast<uint32_t>(blob.size()) > size)
 			{

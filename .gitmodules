@@ -10,3 +10,6 @@
 [submodule "third-party/libpaseto"]
 	path = third-party/libpaseto
 	url = https://github.com/authenticvision/libpaseto
+[submodule "common"]
+	path = common
+	url = https://github.com/herd-fhe/herd_common.git

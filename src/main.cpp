@@ -12,9 +12,11 @@
 
 #include "service/auth_service.hpp"
 #include "service/session_service.hpp"
+#include "service/storage_service.hpp"
 
 #include "controller/auth_controller.hpp"
 #include "controller/session_controller.hpp"
+#include "controller/storage_controller.hpp"
 
 
 std::shared_ptr<grpc::ServerCredentials> build_server_credentials(
@@ -28,9 +30,9 @@ std::shared_ptr<grpc::ServerCredentials> build_server_credentials(
 	if (config.ssl_config)
 	{
 		spdlog::info("Running in SSL mode");
-		grpc::SslServerCredentialsOptions options = {
-				GRPC_SSL_DONT_REQUEST_CLIENT_CERTIFICATE,
-		};
+		grpc::SslServerCredentialsOptions options(
+				GRPC_SSL_DONT_REQUEST_CLIENT_CERTIFICATE
+		);
 
 		auto ca_cert = read_file(config.ssl_config->ca_certificate_path);
 		auto cert = read_file(config.ssl_config->certificate_path);
@@ -65,6 +67,7 @@ int main()
 	AuthService auth_service(paseto_key, std::chrono::seconds(config.security.token_lifetime));
 	SessionService session_service;
 	KeyService key_service;
+	StorageService storage_service("./", 1024*1024*128);
 
 	const auto credentials = build_server_credentials(config.security, auth_service);
 
@@ -78,6 +81,10 @@ int main()
 	SessionController session_controller(session_service, key_service);
 	builder.RegisterService(&session_controller);
 	spdlog::trace("Session controller created");
+
+	StorageController storage_controller(storage_service);
+	builder.RegisterService(&storage_controller);
+	spdlog::trace("Storage controller created");
 
 	auto server = builder.BuildAndStart();
 	spdlog::info("Server listening on address: {}", address);
