@@ -21,6 +21,7 @@ public:
 	void remove_key(const UUID& session_uuid, herd::common::SchemaType type);
 
 	[[nodiscard]] std::vector<herd::common::SchemaType> list_available_keys(const UUID& session_uuid) const;
+	[[nodiscard]] bool schema_key_exists_for_session(const UUID& session_uuid, herd::common::SchemaType type) const noexcept;
 
 private:
 	std::filesystem::path key_storage_dir_;

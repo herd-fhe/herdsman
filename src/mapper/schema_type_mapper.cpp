@@ -4,23 +4,83 @@
 
 namespace mapper
 {
+	herd::proto::SchemaType to_proto(herd::common::SchemaType schema_type)
+	{
+		switch(schema_type)
+		{
+			case herd::common::SchemaType::BINFHE:
+				return herd::proto::BINFHE;
+			default:
+				throw MappingError("Proto schema, model mismatch");
+		}
+	}
+
+	herd::proto::DataType to_proto(herd::common::DataType data_type)
+	{
+		using herd::common::DataType;
+		switch(data_type)
+		{
+			case DataType::BIT:
+				return herd::proto::BIT;
+			case DataType::UINT8:
+				return herd::proto::UINT8;
+			case DataType::UINT16:
+				return herd::proto::UINT16;
+			case DataType::UINT32:
+				return herd::proto::UINT32;
+			case DataType::UINT64:
+				return herd::proto::UINT64;
+			case DataType::INT8:
+				return herd::proto::INT8;
+			case DataType::INT16:
+				return herd::proto::INT16;
+			case DataType::INT32:
+				return herd::proto::INT32;
+			case DataType::INT64:
+				return herd::proto::INT64;
+			default:
+				throw MappingError("Proto schema, model mismatch");
+		}
+	}
+
+	google::protobuf::RepeatedPtrField<herd::proto::ColumnDescriptor> to_proto(const herd::common::column_map_type& columns)
+	{
+		assert(std::numeric_limits<uint8_t>::max() >= columns.size() && "Columns limit");
+
+		google::protobuf::RepeatedPtrField<herd::proto::ColumnDescriptor> proto_columns;
+
+		proto_columns.Reserve(static_cast<int>(columns.size()));
+
+		std::vector<std::tuple<std::string, herd::common::DataType, uint8_t>> columns_temp;
+		std::ranges::transform(columns, std::back_inserter(columns_temp),
+							   [](const auto& column)
+							   {
+								   return std::make_tuple(column.first, column.second.type, column.second.index);
+							   }
+        );
+		std::ranges::sort(columns_temp,
+						  [](const auto& rhs, const auto& lhs)
+						  {
+							  return std::get<2>(rhs) < std::get<2>(lhs);
+						  }
+        );
+
+		for (const auto& [name, type, index]: columns_temp)
+		{
+			const auto proto_column = proto_columns.Add();
+			proto_column->set_name(name);
+			proto_column->set_type(to_proto(type));
+		}
+
+		return proto_columns;
+	}
+
 	herd::common::SchemaType to_model(herd::proto::SchemaType data_type)
 	{
 		switch(data_type)
 		{
 			case herd::proto::BINFHE:
 				return herd::common::SchemaType::BINFHE;
-			default:
-				throw MappingError("Proto schema, model mismatch");
-		}
-	}
-
-	herd::proto::SchemaType to_proto(herd::common::SchemaType data_type)
-	{
-		switch(data_type)
-		{
-			case herd::common::SchemaType::BINFHE:
-				return herd::proto::BINFHE;
 			default:
 				throw MappingError("Proto schema, model mismatch");
 		}

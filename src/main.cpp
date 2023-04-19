@@ -82,7 +82,7 @@ int main()
 	builder.RegisterService(&session_controller);
 	spdlog::trace("Session controller created");
 
-	StorageController storage_controller(storage_service);
+	StorageController storage_controller(storage_service, session_service, key_service);
 	builder.RegisterService(&storage_controller);
 	spdlog::trace("Storage controller created");
 

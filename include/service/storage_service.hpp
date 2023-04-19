@@ -28,19 +28,21 @@ public:
 		herd::common::column_map_type columns;
 
 		std::size_t allocated_chunks;
+		uint32_t row_count;
 		bool uploaded;
 		bool busy;
 	};
 
 	StorageService(std::filesystem::path storage_dir, std::size_t max_chunk_size);
 
-	UUID create_data_frame(const UUID& session_uuid, std::string frame_name, herd::common::SchemaType type, herd::common::column_map_type column_map);
+	UUID create_data_frame(const UUID& session_uuid, std::string frame_name, herd::common::SchemaType type, herd::common::column_map_type column_map,  uint32_t row_count);
 	uint32_t append_to_data_frame(const UUID& session_uuid, const UUID& uuid, const uint8_t* data, std::size_t size);
 	void mark_data_frame_as_uploaded(const UUID& session_uuid, const UUID& uuid);
 
 	[[nodiscard]] std::vector<std::byte> get_data_from_data_frame(const UUID& session_uuid, const UUID& uuid, std::size_t offset, std::size_t len);
 
 	[[nodiscard]] bool data_frame_exists(const UUID& session_uuid, const UUID& uuid) const;
+	[[nodiscard]] bool data_frame_busy(const UUID& session_uuid, const UUID& uuid) const;
 
 	void remove_data_frame(const UUID& session_uuid, const UUID& uuid);
 

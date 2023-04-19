@@ -68,7 +68,7 @@ std::vector<StorageService::DataFrameEntry> StorageService::list_session_data_fr
 	return result;
 }
 
-UUID StorageService::create_data_frame(const UUID& session_uuid, std::string frame_name, herd::common::SchemaType type, herd::common::column_map_type column_map)
+UUID StorageService::create_data_frame(const UUID& session_uuid, std::string frame_name, herd::common::SchemaType type, herd::common::column_map_type column_map, uint32_t row_count)
 {
 	std::unique_lock lock(descriptors_mutex_);
 
@@ -77,6 +77,7 @@ UUID StorageService::create_data_frame(const UUID& session_uuid, std::string fra
 	entry.columns = std::move(column_map);
 	entry.schema_type = type;
 	entry.uuid = UUID();
+	entry.row_count = row_count;
 	entry.uploaded = false;
 	entry.busy = true;
 
@@ -177,6 +178,27 @@ bool StorageService::data_frame_exists(const UUID& session_uuid, const UUID& uui
 				return entry.second.uuid == uuid;
 			}
 	);
+}
+
+bool StorageService::data_frame_busy(const UUID& session_uuid, const UUID& uuid) const
+{
+	std::unique_lock lock(descriptors_mutex_);
+
+	auto [iter_begin, iter_end] = data_frames_.equal_range(session_uuid);
+	const auto data_frame_iter = std::find_if(
+			iter_begin, iter_end,
+			[&uuid](const auto& entry)
+			{
+				return entry.second.uuid == uuid;
+			}
+	);
+
+	if (data_frame_iter != iter_end)
+	{
+		return data_frame_iter->second.busy;
+	}
+
+	throw ObjectNotFoundException("Data frame does not exist");
 }
 
 void StorageService::create_directory_for_session(const UUID& session_uuid)

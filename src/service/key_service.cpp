@@ -87,3 +87,14 @@ std::vector<herd::common::SchemaType> KeyService::list_available_keys(const UUID
 
 	return types;
 }
+
+bool KeyService::schema_key_exists_for_session(const UUID& session_uuid, herd::common::SchemaType type) const noexcept
+{
+	const auto [keys_begin, keys_end] = keys_.equal_range(session_uuid);
+	return std::any_of(keys_begin, keys_end,
+		[type](const auto& entry)
+		{
+			return entry.second.type == type;
+		}
+	);
+}

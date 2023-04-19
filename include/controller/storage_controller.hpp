@@ -3,14 +3,19 @@
 
 #include <storage.grpc.pb.h>
 
-#include "service/session_service.hpp"
 #include "service/storage_service.hpp"
+#include "service/session_service.hpp"
+#include "service/key_service.hpp"
 
 
 class StorageController: public herd::proto::Storage::Service
 {
 public:
-	explicit StorageController(StorageService& storage_service) noexcept;
+	StorageController(
+			StorageService& storage_service,
+			SessionService& session_service,
+			KeyService& key_service
+	) noexcept;
 
 	grpc::Status add_data_frame(
 			grpc::ServerContext* context,
@@ -37,6 +42,8 @@ public:
 
 private:
 	StorageService& storage_service_;
+	SessionService& session_service_;
+	KeyService& key_service_;
 };
 
 #endif //HERDSMAN_STORAGE_CONTROLLER_HPP
