@@ -74,7 +74,7 @@ void SessionService::destroy_session_by_uuid(uint64_t user_id, const UUID& uuid)
 {
 	if(!session_exists_by_uuid(user_id, uuid))
 	{
-		throw ObjectNotFoundException("Session does not exists");
+		throw ObjectNotFoundException("Session does not exist");
 	}
 
 	const auto [user_sessions_begin, user_sessions_end] = sessions_.equal_range(user_id);

@@ -29,8 +29,12 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install libomp-dev libsodium-dev libprotobuf-dev ninja-build protobuf-compiler libgrpc++-dev protobuf-compiler-grpc
+          sudo apt install build-essential autoconf libtool pkg-config libomp-dev libsodium-dev libprotobuf-dev ninja-build
         shell: bash
+
+      - uses: ./proto/action/install-grpc
+        with:
+          prefix: ${{github.workspace}}/external/grpc
 
       - name: Cache OpenFHE build
         id: openfhe-build

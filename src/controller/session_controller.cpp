@@ -1,6 +1,6 @@
 #include "controller/session_controller.hpp"
 
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
 
 #include "mapper/schema_type_mapper.hpp"
 #include "utils/controller_utils.hpp"
@@ -145,6 +145,12 @@ grpc::Status SessionController::add_key(
 		const auto session_uuid = UUID(message.options().session_uuid());
 		const auto size = message.options().size();
 
+		if(!session_service_.session_exists_by_uuid(user_id, session_uuid))
+		{
+			spdlog::info("There is no session with uuid: {} associated to user: {}", session_uuid.as_string(), user_id);
+			return {StatusCode::FAILED_PRECONDITION, "Session not found"};
+		}
+
 		std::vector<std::byte> key_data;
 		key_data.resize(size);
 
@@ -159,6 +165,12 @@ grpc::Status SessionController::add_key(
 			}
 
 			const auto& blob = message.data().blob();
+
+			if(blob.empty())
+			{
+				spdlog::info("Empty packet received");
+				return {StatusCode::ABORTED, "Empty packet received"};
+			}
 
 			if(received + static_cast<uint32_t>(blob.size()) > size)
 			{

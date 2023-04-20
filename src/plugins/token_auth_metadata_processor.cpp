@@ -22,10 +22,10 @@ TokenAuthMetadataProcessor::TokenAuthMetadataProcessor(
 }
 
 grpc::Status TokenAuthMetadataProcessor::Process(
-		const grpc_impl::AuthMetadataProcessor::InputMetadata& auth_metadata,
+		const  AuthMetadataProcessor::InputMetadata& auth_metadata,
 		grpc::AuthContext* context,
-		grpc_impl::AuthMetadataProcessor::OutputMetadata* consumed_auth_metadata,
-		grpc_impl::AuthMetadataProcessor::OutputMetadata* response_metadata)
+		AuthMetadataProcessor::OutputMetadata* consumed_auth_metadata,
+		AuthMetadataProcessor::OutputMetadata* response_metadata)
 {
 	static_cast<void>(response_metadata);
 

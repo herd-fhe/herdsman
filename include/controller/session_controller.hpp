@@ -6,10 +6,11 @@
 #include "service/session_service.hpp"
 #include "service/key_service.hpp"
 
+
 class SessionController: public herd::proto::Session::Service
 {
 public:
-	explicit SessionController(SessionService& session_service, KeyService& key_service) noexcept;
+	SessionController(SessionService& session_service, KeyService& key_service) noexcept;
 
 	//session manipulation
 	grpc::Status create_session(

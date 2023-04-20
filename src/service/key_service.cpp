@@ -2,6 +2,8 @@
 
 #include "spdlog/spdlog.h"
 
+#include "herd_common/schema_type.hpp"
+
 #include "service/common_exceptions.hpp"
 #include "utils/file_utils.hpp"
 
@@ -9,7 +11,7 @@
 namespace fs = std::filesystem;
 
 
-void KeyService::add_key(const UUID& session_uuid, SchemaType type, const std::vector<std::byte>& key_data)
+void KeyService::add_key(const UUID& session_uuid, herd::common::SchemaType type, const std::vector<std::byte>& key_data)
 {
 	if(!keys_.contains(session_uuid))
 	{
@@ -17,7 +19,7 @@ void KeyService::add_key(const UUID& session_uuid, SchemaType type, const std::v
 	}
 
 	const auto session_dir_path = key_storage_dir_ / session_uuid.as_string();
-	const auto type_name = std::to_string(static_cast<std::underlying_type_t<SchemaType>>(type)) + ".key";
+	const auto type_name = std::to_string(static_cast<std::underlying_type_t<herd::common::SchemaType>>(type)) + ".key";
 
 	const auto key_path = session_dir_path / type_name;
 
@@ -34,7 +36,7 @@ void KeyService::add_key(const UUID& session_uuid, SchemaType type, const std::v
     );
 }
 
-void KeyService::create_directory_for_session(const UUID& uuid) const
+void KeyService::create_directory_for_session(const UUID& uuid)
 {
 	const auto session_dir_path = key_storage_dir_ / uuid.as_string();
 	const auto session_dir_status = fs::status(session_dir_path);
@@ -53,7 +55,7 @@ void KeyService::create_directory_for_session(const UUID& uuid) const
 	}
 }
 
-void KeyService::remove_key(const UUID& session_uuid, SchemaType type)
+void KeyService::remove_key(const UUID& session_uuid, herd::common::SchemaType type)
 {
 	const auto [keys_begin, keys_end] = keys_.equal_range(session_uuid);
 	const auto key_with_type_predicate = [type](const auto& key_entry)
@@ -71,9 +73,9 @@ void KeyService::remove_key(const UUID& session_uuid, SchemaType type)
 	}
 }
 
-std::vector<SchemaType> KeyService::list_available_keys(const UUID& session_uuid) const
+std::vector<herd::common::SchemaType> KeyService::list_available_keys(const UUID& session_uuid) const
 {
-	std::vector<SchemaType> types;
+	std::vector<herd::common::SchemaType> types;
 	const auto [keys_begin, keys_end] = keys_.equal_range(session_uuid);
 
 	std::transform(keys_begin, keys_end, std::back_inserter(types),
@@ -84,4 +86,15 @@ std::vector<SchemaType> KeyService::list_available_keys(const UUID& session_uuid
    );
 
 	return types;
+}
+
+bool KeyService::schema_key_exists_for_session(const UUID& session_uuid, herd::common::SchemaType type) const noexcept
+{
+	const auto [keys_begin, keys_end] = keys_.equal_range(session_uuid);
+	return std::any_of(keys_begin, keys_end,
+		[type](const auto& entry)
+		{
+			return entry.second.type == type;
+		}
+	);
 }

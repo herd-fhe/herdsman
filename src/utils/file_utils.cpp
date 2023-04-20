@@ -3,6 +3,8 @@
 #include <fstream>
 
 
+namespace fs = std::filesystem;
+
 std::string read_file(const std::filesystem::path &filepath)
 {
 	if(!std::filesystem::exists(filepath))
@@ -34,16 +36,63 @@ std::string read_file(const std::filesystem::path &filepath)
 	return string_data;
 }
 
-void write_file(const std::filesystem::path& filepath, const std::vector<std::byte>& val)
+void write_file(const std::filesystem::path& filepath, const std::vector<std::byte>& data)
 {
-	std::fstream file(filepath, std::ios_base::out | std::ios_base::trunc | std::ios_base::binary);
+	std::ofstream file(filepath, std::ios_base::trunc | std::ios_base::binary);
 
-	file.write(reinterpret_cast<const char*>(val.data()), static_cast<long>(val.size()));
-	if(!file)
-	{
-		file.close();
-		throw FileWriteError("Failed to write to file");
-	}
+	append_to_file(file, data);
 
 	file.close();
+}
+
+void append_to_file(const std::filesystem::path& filepath, const std::vector<std::byte>& data)
+{
+	append_to_file(filepath, reinterpret_cast<const uint8_t*>(data.data()), data.size());
+}
+
+void append_to_file(const std::filesystem::path& filepath, const uint8_t* data, std::size_t size)
+{
+	std::ofstream file(filepath, std::ios_base::app | std::ios_base::binary);
+
+	append_to_file(file, data, size);
+}
+
+
+void append_to_file(std::ofstream& out_file, const std::vector<std::byte>& data)
+{
+	append_to_file(out_file, reinterpret_cast<const uint8_t*>(data.data()), data.size());
+}
+
+void append_to_file(std::ofstream& out_file, const uint8_t* data, std::size_t size)
+{
+	out_file.write(reinterpret_cast<const char*>(data), static_cast<long>(size));
+	if(!out_file)
+	{
+		out_file.close();
+		throw FileWriteError("Failed to append to file");
+	}
+}
+
+bool file_exist(const std::filesystem::path& file_path)
+{
+	const auto file_status = fs::status(file_path);
+	return fs::is_regular_file(file_status);
+}
+
+bool directory_exist(const std::filesystem::path& dir_path)
+{
+	const auto directory_status = fs::status(dir_path);
+	return fs::is_directory(directory_status);
+}
+
+std::size_t get_file_size(const std::filesystem::path& file_path)
+{
+	try
+	{
+		return fs::file_size(file_path);
+	}
+	catch(const fs::filesystem_error& error)
+	{
+		std::throw_with_nested(FileNotExistError("Failed to get size of file"));
+	}
 }

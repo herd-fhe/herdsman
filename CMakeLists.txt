@@ -90,9 +90,12 @@ add_subdirectory(third-party/spdlog EXCLUDE_FROM_ALL)
 find_package(Threads REQUIRED)
 find_package(OpenMP REQUIRED)
 
-# Targets
 ## Herd - proto
 add_subdirectory(proto)
+
+add_subdirectory(common)
+
+# Targets
 
 ## Herdsman - config
 add_custom_target(herdsman-config ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/herdsman.yaml)
@@ -121,10 +124,12 @@ target_sources(
 
         src/controller/auth_controller.cpp
         src/controller/session_controller.cpp
+        src/controller/storage_controller.cpp
 
         src/service/auth_service.cpp
         src/service/session_service.cpp
         src/service/key_service.cpp
+        src/service/storage_service.cpp
 
         src/mapper/schema_type_mapper.cpp
 
@@ -139,14 +144,14 @@ target_sources(
 
         include/controller/auth_controller.hpp
         include/controller/session_controller.hpp
+        include/controller/storage_controller.hpp
 
         include/service/auth_service.hpp
         include/service/session_service.hpp
         include/service/key_service.hpp
+        include/service/storage_service.hpp
 
         include/mapper/schema_type_mapper.hpp
-
-        include/schema_type.hpp
 
         include/service/common_exceptions.hpp
 
@@ -185,6 +190,7 @@ target_link_libraries(
         spdlog::spdlog_header_only
 
         herd_proto
+        herd_common
 )
 
 target_include_directories(
