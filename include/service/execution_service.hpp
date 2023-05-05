@@ -28,6 +28,15 @@ public:
 
 	struct JobDescriptor
 	{
+		JobDescriptor(
+				const herd::common::UUID& job_uuid,
+				uint8_t current_job_stage, herd::common::JobStatus job_status,
+				uint64_t estimated_job_complexity, const herd::common::ExecutionPlan& job_plan)
+				: uuid(job_uuid), current_stage(current_job_stage),
+				status(job_status), estimated_complexity(estimated_job_complexity),
+				plan(job_plan)
+		{}
+
 		herd::common::UUID uuid;
 		uint8_t current_stage;
 		herd::common::JobStatus status;
