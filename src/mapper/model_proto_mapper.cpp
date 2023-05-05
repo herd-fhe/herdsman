@@ -1,6 +1,42 @@
-#include "mapper/schema_type_mapper.hpp"
+#include "mapper/model_proto_mapper.hpp"
 
-#include "herd_common/schema_type.hpp"
+#include "herd/common/model/schema_type.hpp"
+
+
+namespace
+{
+	herd::common::ExecutionPlan::StageType detect_stage_type(const herd::proto::ExecutionStage& stage)
+	{
+		if(stage.has_input())
+		{
+			return herd::common::ExecutionPlan::StageType::INPUT;
+		}
+		else if(stage.has_mapping())
+		{
+			return herd::common::ExecutionPlan::StageType::MAP;
+		}
+		else
+		{
+			throw mapper::MappingError("Proto schema, model mismatch");
+		}
+	}
+
+	std::optional<herd::common::UUID> get_required_data_frame(const herd::proto::ExecutionStage& stage)
+	{
+		if(stage.has_input())
+		{
+			return herd::common::UUID(stage.input().data_frame_uuid());
+		}
+		else if(stage.has_mapping())
+		{
+			return std::nullopt;
+		}
+		else
+		{
+			throw mapper::MappingError("Proto schema, model mismatch");
+		}
+	}
+}
 
 namespace mapper
 {
@@ -38,6 +74,24 @@ namespace mapper
 				return herd::proto::INT32;
 			case DataType::INT64:
 				return herd::proto::INT64;
+			default:
+				throw MappingError("Proto schema, model mismatch");
+		}
+	}
+
+	herd::proto::JobStatus to_proto(herd::common::JobStatus status)
+	{
+		using herd::common::JobStatus;
+		switch(status)
+		{
+			case JobStatus::WAITING_FOR_EXECUTION:
+				return herd::proto::WAITING_FOR_EXECUTION;
+			case JobStatus::PENDING:
+				return herd::proto::PENDING;
+			case JobStatus::COMPLETED:
+				return herd::proto::COMPLETED;
+			case JobStatus::FAILED:
+				return herd::proto::FAILED;
 			default:
 				throw MappingError("Proto schema, model mismatch");
 		}
@@ -118,13 +172,43 @@ namespace mapper
 	{
 		herd::common::column_map_type model_columns;
 
-		for (uint8_t index = 0; const auto& column: columns)
+		for(uint8_t index = 0; const auto& column: columns)
 		{
 			model_columns.try_emplace(column.name(), index, to_model(column.type()));
-
 			++index;
 		}
 
 		return model_columns;
+	}
+
+	herd::common::ExecutionPlan to_model(const herd::proto::ExecutionPlan& plan)
+	{
+		using namespace herd::common;
+
+		ExecutionPlan execution_plan;
+		std::unordered_map<std::size_t, decltype(ExecutionPlan::stages)::iterator> index_to_node;
+
+		for(std::size_t stage_id = 0; const auto& stage: plan.stages())
+		{
+			const auto iterator = execution_plan.stages.emplace(ExecutionPlan::Stage{
+					detect_stage_type(stage),
+					to_model(stage.schema_type()),
+					get_required_data_frame(stage)
+			});
+
+			index_to_node.emplace(stage_id, iterator);
+			++stage_id;
+		}
+
+		for(std::size_t stage_id = 0; const auto& stage: plan.stages())
+		{
+			for(const auto parent: stage.parent_stages())
+			{
+				execution_plan.stages.add_edge(index_to_node[stage_id], index_to_node[parent]);
+			}
+			++stage_id;
+		}
+
+		return execution_plan;
 	}
 }

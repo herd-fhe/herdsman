@@ -19,7 +19,7 @@ bool SessionService::session_exists_by_name(uint64_t user_id, const std::string 
 	return session_iter != user_sessions_end;
 }
 
-bool SessionService::session_exists_by_uuid(uint64_t user_id, const UUID& uuid) const noexcept
+bool SessionService::session_exists_by_uuid(uint64_t user_id, const herd::common::UUID& uuid) const noexcept
 {
 	const auto [user_sessions_begin, user_sessions_end] = sessions_.equal_range(user_id);
 
@@ -32,7 +32,7 @@ bool SessionService::session_exists_by_uuid(uint64_t user_id, const UUID& uuid) 
 	return session_iter != user_sessions_end;
 }
 
-UUID SessionService::create_session(uint64_t user_id, const std::string& session_name)
+herd::common::UUID SessionService::create_session(uint64_t user_id, const std::string& session_name)
 {
 	assert(!session_name.empty());
 
@@ -70,7 +70,7 @@ void SessionService::destroy_session_by_name(uint64_t user_id, const std::string
 	sessions_.erase(to_remove_iter);
 }
 
-void SessionService::destroy_session_by_uuid(uint64_t user_id, const UUID& uuid)
+void SessionService::destroy_session_by_uuid(uint64_t user_id, const herd::common::UUID& uuid)
 {
 	if(!session_exists_by_uuid(user_id, uuid))
 	{

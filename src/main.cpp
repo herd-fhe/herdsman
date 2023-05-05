@@ -17,6 +17,8 @@
 #include "controller/auth_controller.hpp"
 #include "controller/session_controller.hpp"
 #include "controller/storage_controller.hpp"
+#include "service/execution_service.hpp"
+#include "utils/executor/executor.hpp"
 
 
 std::shared_ptr<grpc::ServerCredentials> build_server_credentials(
@@ -27,7 +29,7 @@ std::shared_ptr<grpc::ServerCredentials> build_server_credentials(
 	std::vector<std::string> path_not_secured = {std::string("/") + herd::proto::Auth::service_full_name() + "/authorize_connection"};
 	const auto auth_metadata_processor = std::make_shared<TokenAuthMetadataProcessor>(auth_service, path_not_secured);
 
-	if (config.ssl_config)
+	if(config.ssl_config)
 	{
 		spdlog::info("Running in SSL mode");
 		grpc::SslServerCredentialsOptions options(
@@ -68,6 +70,10 @@ int main()
 	SessionService session_service;
 	KeyService key_service;
 	StorageService storage_service("./", 1024*1024*128);
+	ExecutionService execution_service(key_service, storage_service);
+
+	const auto executor = std::make_shared<executor::Executor>(execution_service);
+	execution_service.set_executor(executor);
 
 	const auto credentials = build_server_credentials(config.security, auth_service);
 

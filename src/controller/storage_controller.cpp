@@ -2,9 +2,9 @@
 
 #include <spdlog/spdlog.h>
 
-#include "mapper/schema_type_mapper.hpp"
-#include "utils/controller_utils.hpp"
+#include "mapper/model_proto_mapper.hpp"
 #include "service/common_exceptions.hpp"
+#include "utils/controller_utils.hpp"
 
 
 StorageController::StorageController(StorageService& storage_service, SessionService& session_service, KeyService& key_service) noexcept
@@ -34,7 +34,7 @@ grpc::Status StorageController::add_data_frame(::grpc::ServerContext* context, :
 	try
 	{
 		const auto type = mapper::to_model(message.info().type());
-		const auto session_uuid = UUID(message.info().session_uuid());
+		const auto session_uuid = herd::common::UUID(message.info().session_uuid());
 		const auto name = message.info().name();
 		const auto row_count = message.info().row_count();
 		const auto columns = mapper::to_model(message.info().columns());
@@ -51,7 +51,7 @@ grpc::Status StorageController::add_data_frame(::grpc::ServerContext* context, :
 			return {StatusCode::FAILED_PRECONDITION, "Cloud key not found"};
 		}
 
-		const UUID data_frame_uuid = storage_service_.create_data_frame(session_uuid, name, type, columns, row_count);
+		const herd::common::UUID data_frame_uuid = storage_service_.create_data_frame(session_uuid, name, type, columns, row_count);
 
 		herd::proto::DataFrameAddResponse response;
 		response.mutable_metadata()->set_uuid(data_frame_uuid.as_string());
@@ -124,8 +124,8 @@ grpc::Status StorageController::remove_data_frame(::grpc::ServerContext* context
 
 	try
 	{
-		const auto session_uuid = UUID(request->session_uuid());
-		const auto data_frame_uuid = UUID(request->uuid());
+		const auto session_uuid = herd::common::UUID(request->session_uuid());
+		const auto data_frame_uuid = herd::common::UUID(request->uuid());
 
 		if(!session_service_.session_exists_by_uuid(user_id, session_uuid))
 		{
@@ -165,7 +165,7 @@ grpc::Status StorageController::list_data_frames(::grpc::ServerContext* context,
 
 	try
 	{
-		const auto session_uuid = UUID(request->session_uuid());
+		const auto session_uuid = herd::common::UUID(request->session_uuid());
 
 		if(!session_service_.session_exists_by_uuid(user_id, session_uuid))
 		{
@@ -186,7 +186,7 @@ grpc::Status StorageController::list_data_frames(::grpc::ServerContext* context,
 		}
 
 		//check size
-		response->mutable_dataframes()->Reserve(static_cast<int>(data_frames.size()));
+		response->mutable_dataframes()->Reserve(static_cast<int>(data_frames.size())); //todo: fix casting
 
 		for(const auto& data_frame: data_frames)
 		{

@@ -2,9 +2,9 @@
 
 #include <spdlog/spdlog.h>
 
-#include "mapper/schema_type_mapper.hpp"
-#include "utils/controller_utils.hpp"
+#include "mapper/model_proto_mapper.hpp"
 #include "service/common_exceptions.hpp"
+#include "utils/controller_utils.hpp"
 
 
 SessionController::SessionController(SessionService& session_service, KeyService& key_service) noexcept
@@ -62,7 +62,7 @@ grpc::Status SessionController::destroy_session(
 
 	try
 	{
-		const UUID session_uuid(request->uuid());
+		const herd::common::UUID session_uuid(request->uuid());
 		session_service_.destroy_session_by_uuid(user_id, session_uuid);
 	}
 	catch(const ObjectNotFoundException&)
@@ -142,7 +142,7 @@ grpc::Status SessionController::add_key(
 	try
 	{
 		const auto type = mapper::to_model(message.options().type());
-		const auto session_uuid = UUID(message.options().session_uuid());
+		const auto session_uuid = herd::common::UUID(message.options().session_uuid());
 		const auto size = message.options().size();
 
 		if(!session_service_.session_exists_by_uuid(user_id, session_uuid))
@@ -217,7 +217,7 @@ grpc::Status SessionController::remove_key(
 
 	try
 	{
-		const UUID session_uuid(request->session_uuid());
+		const herd::common::UUID session_uuid(request->session_uuid());
 		if(!session_service_.session_exists_by_uuid(user_id, session_uuid))
 		{
 			spdlog::info("There is no session with uuid: {} associated to user: {}", request->session_uuid(), user_id);
@@ -256,7 +256,7 @@ grpc::Status SessionController::list_keys(
 
 	try
 	{
-		const UUID session_uuid(request->session_uuid());
+		const herd::common::UUID session_uuid(request->session_uuid());
 		if(!session_service_.session_exists_by_uuid(user_id, session_uuid))
 		{
 			spdlog::info("There is no session with uuid: {} associated to user: {}", request->session_uuid(), user_id);
