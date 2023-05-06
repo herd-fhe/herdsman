@@ -29,8 +29,22 @@ struct Config
 		std::optional<SSLConfig> ssl_config;
 	};
 
+	struct LoggingConfig
+	{
+		enum class LogLevel
+		{
+			INFO,
+			WARNING,
+			ERROR,
+			DEBUG
+		};
+
+		LogLevel level;
+	};
+
 	ServerConfig server;
 	SecurityConfig security;
+	LoggingConfig logging;
 };
 
 

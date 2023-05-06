@@ -65,7 +65,7 @@ namespace executor
 			}
 			if(event.has_value())
 			{
-				spdlog::trace("Received message with type id {}", event->index());
+				spdlog::debug("Received message with type id {}", event->index());
 				executor.dispatch_message(event.value());
 			}
 		}

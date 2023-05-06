@@ -10,15 +10,17 @@
 
 #include "plugins/token_auth_metadata_processor.hpp"
 
+#include "utils/executor/executor.hpp"
+
 #include "service/auth_service.hpp"
 #include "service/session_service.hpp"
 #include "service/storage_service.hpp"
+#include "service/execution_service.hpp"
 
 #include "controller/auth_controller.hpp"
+#include "controller/execution_controller.hpp"
 #include "controller/session_controller.hpp"
 #include "controller/storage_controller.hpp"
-#include "service/execution_service.hpp"
-#include "utils/executor/executor.hpp"
 
 
 std::shared_ptr<grpc::ServerCredentials> build_server_credentials(
@@ -59,9 +61,27 @@ std::shared_ptr<grpc::ServerCredentials> build_server_credentials(
 	}
 }
 
+void init_global_logger(const Config::LoggingConfig& config)
+{
+	using enum Config::LoggingConfig::LogLevel;
+
+	const std::unordered_map<Config::LoggingConfig::LogLevel, spdlog::level::level_enum> spdlog_log_level_map{
+		{INFO, spdlog::level::level_enum::info},
+		{WARNING, spdlog::level::level_enum::warn},
+		{ERROR, spdlog::level::level_enum::err},
+		{DEBUG, spdlog::level::level_enum::debug}
+	};
+
+	const auto spdlog_level = spdlog_log_level_map.at(config.level);
+	spdlog::set_level(spdlog_level);
+	spdlog::info("Logger set up to: {} level", spdlog::level::to_short_c_str(spdlog_level));
+}
+
 int main()
 {
 	const auto config = load_config("./herdsman.yaml");
+
+	init_global_logger(config.logging);
 
 	const paseto_key_type paseto_key = init_paseto(config.security.secret_key);
 	const std::string address = config.server.address + ":" + std::to_string(config.server.port);
@@ -82,15 +102,19 @@ int main()
 
 	AuthController auth_controller(auth_service);
 	builder.RegisterService(&auth_controller);
-	spdlog::trace("Auth controller created");
+	spdlog::debug("Auth controller created");
 
 	SessionController session_controller(session_service, key_service);
 	builder.RegisterService(&session_controller);
-	spdlog::trace("Session controller created");
+	spdlog::debug("Session controller created");
 
 	StorageController storage_controller(storage_service, session_service, key_service);
 	builder.RegisterService(&storage_controller);
-	spdlog::trace("Storage controller created");
+	spdlog::debug("Storage controller created");
+
+	ExecutionController execution_controller(execution_service, session_service);
+	builder.RegisterService(&execution_controller);
+	spdlog::debug("Execution controller created");
 
 	auto server = builder.BuildAndStart();
 	spdlog::info("Server listening on address: {}", address);
