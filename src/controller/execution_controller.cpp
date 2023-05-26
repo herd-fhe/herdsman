@@ -120,6 +120,20 @@ grpc::Status ExecutionController::schedule_job(grpc::ServerContext* context, con
 			return {StatusCode::FAILED_PRECONDITION, "Session not found"};
 		}
 
+		const auto execution_plan = mapper::to_model(request->plan());
+
+		const auto description = execution_service_.schedule_job(session_uuid, execution_plan);
+
+		response->set_uuid(description.uuid.as_string());
+		response->set_estimated_complexity(description.estimated_complexity);
+		response->mutable_plan()->CopyFrom(mapper::to_proto(description.plan));
+
+		return Status::OK;
+	}
+	catch(const mapper::MappingError&)
+	{
+		spdlog::info("Failed to schedule job for session {} associated to user {}. Invalid Execution Plan", request->session_uuid(), user_id);
+		return {StatusCode::INVALID_ARGUMENT, "Invalid Execution Plan"};
 	}
 	catch(const std::runtime_error& error)
 	{

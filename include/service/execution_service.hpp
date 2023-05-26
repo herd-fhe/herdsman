@@ -12,7 +12,7 @@
 
 #include "herd/common/uuid.hpp"
 #include "herd/common/model/job.hpp"
-#include "herd/common/model/execution_plan.hpp"
+#include "herd/common/model/executor/execution_plan.hpp"
 #include "utils/execution_plan/execution_plan_analyzer.hpp"
 #include "utils/executor/i_executor.hpp"
 

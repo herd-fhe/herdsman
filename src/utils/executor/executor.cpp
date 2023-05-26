@@ -30,9 +30,12 @@ namespace executor
 
 	void Executor::send_event(ExecutorEvent event)
 	{
-		std::unique_lock lock(event_queue_mutex_);
+		{
+			std::unique_lock lock(event_queue_mutex_);
 
-		event_queue_.emplace(event);
+			event_queue_.emplace(event);
+		}
+		event_queue_cv_.notify_one();
 	}
 
 	void Executor::thread_body(Executor& executor)

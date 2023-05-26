@@ -4,7 +4,7 @@
 #include <unordered_set>
 
 #include "herd/common/model/schema_type.hpp"
-#include "herd/common/model/execution_plan.hpp"
+#include "herd/common/model/executor/execution_plan.hpp"
 #include "herd/common/uuid.hpp"
 
 
