@@ -18,5 +18,10 @@ struct ObjectNotFoundException: public std::runtime_error
 	using std::runtime_error::runtime_error;
 };
 
+struct ResourceLockedException: public std::runtime_error
+{
+	using std::runtime_error::runtime_error;
+};
+
 
 #endif //HERDSMAN_COMMON_EXCEPTIONS_HPP

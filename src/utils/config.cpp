@@ -72,6 +72,37 @@ namespace
 		}
 		return security_config;
 	}
+
+	Config::LoggingConfig::LogLevel map_log_level(const std::string& log_level_name)
+	{
+		const std::unordered_map<std::string, Config::LoggingConfig::LogLevel> level_mapping{
+				{"INFO", Config::LoggingConfig::LogLevel::INFO},
+				{"WARNING", Config::LoggingConfig::LogLevel::WARNING},
+				{"ERROR", Config::LoggingConfig::LogLevel::ERROR},
+				{"DEBUG", Config::LoggingConfig::LogLevel::DEBUG}
+		};
+
+		for(const auto& [name, enum_value]: level_mapping)
+		{
+			if(log_level_name == name)
+			{
+				return enum_value;
+			}
+		}
+
+		spdlog::error("Invalid logging level: {}", log_level_name);
+		throw std::runtime_error("Invalid logging level");
+	}
+
+	Config::LoggingConfig load_logging_config(const YAML::Node& node)
+	{
+		Config::LoggingConfig logging_config = {};
+
+		const auto level_string = get_value<std::string>(node, "level");
+		logging_config.level = map_log_level(level_string);
+
+		return logging_config;
+	}
 }
 
 Config load_config(const std::filesystem::path &path)
@@ -108,6 +139,17 @@ Config load_config(const std::filesystem::path &path)
 	{
 		spdlog::error("Failed to read node security");
 		throw std::runtime_error("Failed to read node security");
+	}
+
+	if(const auto node = root_node["logging"]; node)
+	{
+		config.logging = load_logging_config(node);
+	}
+	else
+	{
+		config.logging = Config::LoggingConfig{
+			Config::LoggingConfig::LogLevel::INFO
+		};
 	}
 
 	return config;

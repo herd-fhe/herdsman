@@ -59,7 +59,7 @@ if(!MSVC)
 
     if(ENABLE_COVERAGE)
         target_compile_options(options_target INTERFACE --coverage -O0 -g)
-        target_link_libraries(options_targer INTERFACE --coverage)
+        target_link_libraries(options_target INTERFACE --coverage)
     endif()
 endif()
 
@@ -74,9 +74,6 @@ find_package(SQLite3)
 
 ## Sodium
 pkg_check_modules(SODIUM REQUIRED libsodium)
-
-## UUID
-pkg_search_module(UUID REQUIRED uuid)
 
 ## Paseto
 add_subdirectory(third-party/libpaseto EXCLUDE_FROM_ALL)
@@ -119,19 +116,23 @@ target_sources(
         src/utils/config.cpp
         src/utils/paseto_utils.cpp
         src/utils/file_utils.cpp
-        src/utils/uuid.cpp
         src/utils/controller_utils.cpp
+
+        src/utils/executor/executor.cpp
+        src/utils/execution_plan/execution_plan_analyzer.cpp
 
         src/controller/auth_controller.cpp
         src/controller/session_controller.cpp
         src/controller/storage_controller.cpp
+        src/controller/execution_controller.cpp
 
         src/service/auth_service.cpp
         src/service/session_service.cpp
         src/service/key_service.cpp
         src/service/storage_service.cpp
+        src/service/execution_service.cpp
 
-        src/mapper/schema_type_mapper.cpp
+        src/mapper/model_proto_mapper.cpp
 
         src/plugins/token_auth_metadata_processor.cpp
 
@@ -139,19 +140,27 @@ target_sources(
         include/utils/paseto_utils.hpp
         include/utils/string_utils.hpp
         include/utils/file_utils.hpp
-        include/utils/uuid.hpp
         include/utils/controller_utils.hpp
+
+        include/utils/executor/i_executor.hpp
+        include/utils/executor/executor.hpp
+        include/utils/executor/event/job_scheduled.hpp
+        include/utils/executor/event/event.hpp
+        include/utils/execution_plan/execution_plan_analyzer.hpp
 
         include/controller/auth_controller.hpp
         include/controller/session_controller.hpp
         include/controller/storage_controller.hpp
+        include/controller/execution_controller.hpp
 
         include/service/auth_service.hpp
         include/service/session_service.hpp
         include/service/key_service.hpp
         include/service/storage_service.hpp
+        include/service/execution_service.hpp
+        include/service/i_worker_service.hpp
 
-        include/mapper/schema_type_mapper.hpp
+        include/mapper/model_proto_mapper.hpp
 
         include/service/common_exceptions.hpp
 
@@ -181,7 +190,6 @@ target_link_libraries(
         OpenMP::OpenMP_CXX
 
         ${SODIUM_LIBRARIES}
-        ${UUID_LIBRARIES}
         paseto
         SQLite::SQLite3
 
@@ -245,9 +253,4 @@ if(ENABLE_TESTS)
             options_target
             warnings_target
     )
-
-#    target_sources(
-#            herdsman_test
-#            PRIVATE
-#    )
 endif()

@@ -5,9 +5,8 @@
 #include <algorithm>
 #include <utility>
 #include <span>
-#include <memory>
 
-#include "herd_common/schema_type.hpp"
+#include "herd/common/model/schema_type.hpp"
 
 #include "service/common_exceptions.hpp"
 #include "utils/file_utils.hpp"
@@ -34,7 +33,7 @@ StorageService::StorageService(std::filesystem::path storage_dir, std::size_t ma
 {
 }
 
-std::vector<StorageService::DataFrameEntry> StorageService::list_session_data_frames(const UUID& session_uuid)
+std::vector<StorageService::DataFrameEntry> StorageService::list_session_data_frames(const herd::common::UUID& session_uuid)
 {
 	const auto [frames_begin, frames_end] = data_frames_.equal_range(session_uuid);
 
@@ -53,7 +52,7 @@ std::vector<StorageService::DataFrameEntry> StorageService::list_session_data_fr
 	return result;
 }
 
-std::vector<StorageService::DataFrameEntry> StorageService::list_session_data_frames(const UUID& session_uuid, herd::common::SchemaType type)
+std::vector<StorageService::DataFrameEntry> StorageService::list_session_data_frames(const herd::common::UUID& session_uuid, herd::common::SchemaType type)
 {
 	std::vector<DataFrameEntry> result = list_session_data_frames(session_uuid);
 
@@ -68,7 +67,7 @@ std::vector<StorageService::DataFrameEntry> StorageService::list_session_data_fr
 	return result;
 }
 
-UUID StorageService::create_data_frame(const UUID& session_uuid, std::string frame_name, herd::common::SchemaType type, herd::common::column_map_type column_map, uint32_t row_count)
+herd::common::UUID StorageService::create_data_frame(const herd::common::UUID& session_uuid, std::string frame_name, herd::common::SchemaType type, herd::common::column_map_type column_map, uint32_t row_count)
 {
 	std::unique_lock lock(descriptors_mutex_);
 
@@ -76,7 +75,7 @@ UUID StorageService::create_data_frame(const UUID& session_uuid, std::string fra
 	entry.name = std::move(frame_name);
 	entry.columns = std::move(column_map);
 	entry.schema_type = type;
-	entry.uuid = UUID();
+	entry.uuid = herd::common::UUID();
 	entry.row_count = row_count;
 	entry.uploaded = false;
 	entry.busy = true;
@@ -88,11 +87,9 @@ UUID StorageService::create_data_frame(const UUID& session_uuid, std::string fra
 	return entry.uuid;
 }
 
-uint32_t StorageService::append_to_data_frame(const UUID& session_uuid, const UUID& uuid, const uint8_t* data, std::size_t size)
+uint32_t StorageService::append_to_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid, const uint8_t* data, std::size_t size)
 {
-	static_cast<void>(session_uuid);
-	static_cast<void>(uuid);
-	static_cast<void>(data);
+	std::unique_lock lock(descriptors_mutex_);
 
 	auto [iter_begin, iter_end] = data_frames_.equal_range(session_uuid);
 	const auto data_frame_iter = std::find_if(
@@ -103,7 +100,10 @@ uint32_t StorageService::append_to_data_frame(const UUID& session_uuid, const UU
 			}
     );
 
-	assert(data_frame_iter != iter_end);
+	if(data_frame_iter == iter_end)
+	{
+		throw ObjectNotFoundException("No data frame found");
+	}
 
 	auto& data_frame_entry = data_frame_iter->second;
 
@@ -166,7 +166,7 @@ uint32_t StorageService::append_to_data_frame(const UUID& session_uuid, const UU
 	return stored_rows;
 }
 
-bool StorageService::data_frame_exists(const UUID& session_uuid, const UUID& uuid) const
+bool StorageService::data_frame_exists(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid) const
 {
 	std::unique_lock lock(descriptors_mutex_);
 
@@ -180,7 +180,7 @@ bool StorageService::data_frame_exists(const UUID& session_uuid, const UUID& uui
 	);
 }
 
-bool StorageService::data_frame_busy(const UUID& session_uuid, const UUID& uuid) const
+bool StorageService::data_frame_busy(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid) const
 {
 	std::unique_lock lock(descriptors_mutex_);
 
@@ -193,15 +193,15 @@ bool StorageService::data_frame_busy(const UUID& session_uuid, const UUID& uuid)
 			}
 	);
 
-	if (data_frame_iter != iter_end)
+	if(data_frame_iter == iter_end)
 	{
-		return data_frame_iter->second.busy;
+		throw ObjectNotFoundException("No data frame found");
 	}
 
-	throw ObjectNotFoundException("Data frame does not exist");
+	return data_frame_iter->second.busy;
 }
 
-void StorageService::create_directory_for_session(const UUID& session_uuid)
+void StorageService::create_directory_for_session(const herd::common::UUID& session_uuid)
 {
 	const auto session_dir_path = data_frame_storage_dir_ / session_uuid.as_string();
 
@@ -219,7 +219,7 @@ void StorageService::create_directory_for_session(const UUID& session_uuid)
 	}
 }
 
-void StorageService::create_directory_for_data_frame(const UUID& session_uuid, const UUID& uuid)
+void StorageService::create_directory_for_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid)
 {
 	const auto session_dir_path = data_frame_storage_dir_ / session_uuid.as_string();
 
@@ -243,7 +243,7 @@ void StorageService::create_directory_for_data_frame(const UUID& session_uuid, c
 	}
 }
 
-std::ofstream StorageService::create_chunk_file(const UUID& session_uuid, const UUID& uuid, const std::string& chunk_name)
+std::ofstream StorageService::create_chunk_file(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid, const std::string& chunk_name)
 {
 	assert(!chunk_name.empty());
 
@@ -265,8 +265,10 @@ std::ofstream StorageService::create_chunk_file(const UUID& session_uuid, const 
 	return {data_frame_chunk_path, std::ios_base::binary};
 }
 
-void StorageService::mark_data_frame_as_uploaded(const UUID& session_uuid, const UUID& uuid)
+void StorageService::mark_data_frame_as_uploaded(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid)
 {
+	std::unique_lock lock(descriptors_mutex_);
+
 	auto [iter_begin, iter_end] = data_frames_.equal_range(session_uuid);
 	const auto data_frame_iter = std::find_if(
 			iter_begin, iter_end,
@@ -276,14 +278,39 @@ void StorageService::mark_data_frame_as_uploaded(const UUID& session_uuid, const
 			}
 	);
 
-	assert(data_frame_iter != iter_end);
+	if(data_frame_iter == iter_end)
+	{
+		throw ObjectNotFoundException("No data frame found");
+	}
 
 	auto& data_frame_entry = data_frame_iter->second;
 
 	data_frame_entry.uploaded = true;
 }
 
-void StorageService::remove_data_frame(const UUID& session_uuid, const UUID& uuid)
+void StorageService::lock_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid)
+{
+	std::unique_lock lock(descriptors_mutex_);
+
+	auto [iter_begin, iter_end] = data_frames_.equal_range(session_uuid);
+	const auto data_frame_iter = std::find_if(
+			iter_begin, iter_end,
+			[&uuid](const auto& entry)
+			{
+				return entry.second.uuid == uuid;
+			}
+	);
+
+	if(data_frame_iter == iter_end)
+	{
+		throw ObjectNotFoundException("No data frame found");
+	}
+
+	data_frame_iter->second.busy = true;
+}
+
+
+void StorageService::remove_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid)
 {
 	std::unique_lock lock(descriptors_mutex_);
 
