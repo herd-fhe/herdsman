@@ -67,18 +67,22 @@ std::vector<StorageService::DataFrameEntry> StorageService::list_session_data_fr
 	return result;
 }
 
-herd::common::UUID StorageService::create_data_frame(const herd::common::UUID& session_uuid, std::string frame_name, herd::common::SchemaType type, herd::common::column_map_type column_map, uint32_t row_count)
+herd::common::UUID StorageService::create_data_frame(const herd::common::UUID& session_uuid, std::string frame_name, herd::common::SchemaType type, const std::vector<herd::common::ColumnMeta>& columns, uint32_t row_count)
 {
 	std::unique_lock lock(descriptors_mutex_);
 
 	DataFrameEntry entry = {};
 	entry.name = std::move(frame_name);
-	entry.columns = std::move(column_map);
 	entry.schema_type = type;
 	entry.uuid = herd::common::UUID();
 	entry.row_count = row_count;
 	entry.uploaded = false;
 	entry.busy = true;
+
+	for(uint8_t index = 0; const auto& column: columns)
+	{
+		entry.columns.try_emplace(column.name, herd::common::ColumnDescriptor{index, column.type});
+	}
 
 	create_directory_for_data_frame(session_uuid, entry.uuid);
 

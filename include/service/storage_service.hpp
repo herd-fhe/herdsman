@@ -10,6 +10,7 @@
 #include <condition_variable>
 
 #include "herd/common/model/column_descriptor.hpp"
+#include "herd/common/model/column_meta.hpp"
 #include "herd/common/model/data_type.hpp"
 #include "herd/common/model/schema_type.hpp"
 #include "herd/common/uuid.hpp"
@@ -35,7 +36,7 @@ public:
 
 	StorageService(std::filesystem::path storage_dir, std::size_t max_chunk_size);
 
-	herd::common::UUID create_data_frame(const herd::common::UUID& session_uuid, std::string frame_name, herd::common::SchemaType type, herd::common::column_map_type column_map,  uint32_t row_count);
+	herd::common::UUID create_data_frame(const herd::common::UUID& session_uuid, std::string frame_name, herd::common::SchemaType type, const std::vector<herd::common::ColumnMeta>& columns,  uint32_t row_count);
 	uint32_t append_to_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid, const uint8_t* data, std::size_t size);
 
 	void mark_data_frame_as_uploaded(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid);

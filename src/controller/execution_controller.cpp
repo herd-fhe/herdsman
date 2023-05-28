@@ -2,7 +2,9 @@
 
 #include <spdlog/spdlog.h>
 
-#include "mapper/model_proto_mapper.hpp"
+#include "herd/mapper/executor.hpp"
+#include "herd/mapper/exception.hpp"
+
 #include "utils/controller_utils.hpp"
 
 
@@ -39,7 +41,7 @@ grpc::Status ExecutionController::get_job_state(::grpc::ServerContext* context, 
 		const auto state = execution_service_.get_job_state(session_uuid, job_uuid);
 
 		response->set_uuid(state.uuid.as_string());
-		response->set_status(mapper::to_proto(state.status));
+		response->set_status(herd::mapper::to_proto(state.status));
 		if(state.current_stage.has_value())
 		{
 			response->set_current_stage(state.current_stage.value());
@@ -82,7 +84,7 @@ grpc::Status ExecutionController::list_jobs(::grpc::ServerContext* context, cons
 		{
 			const auto state_proto = states_proto->Add();
 			state_proto->set_uuid(state.uuid.as_string());
-			state_proto->set_status(mapper::to_proto(state.status));
+			state_proto->set_status(herd::mapper::to_proto(state.status));
 			if(state.current_stage.has_value())
 			{
 				state_proto->set_current_stage(state.current_stage.value());
@@ -120,17 +122,15 @@ grpc::Status ExecutionController::schedule_job(grpc::ServerContext* context, con
 			return {StatusCode::FAILED_PRECONDITION, "Session not found"};
 		}
 
-		const auto execution_plan = mapper::to_model(request->plan());
+		const auto execution_plan = herd::mapper::to_model(request->plan());
 
 		const auto description = execution_service_.schedule_job(session_uuid, execution_plan);
 
 		response->set_uuid(description.uuid.as_string());
 		response->set_estimated_complexity(description.estimated_complexity);
-		response->mutable_plan()->CopyFrom(mapper::to_proto(description.plan));
-
-		return Status::OK;
+		response->mutable_plan()->CopyFrom(herd::mapper::to_proto(description.plan));
 	}
-	catch(const mapper::MappingError&)
+	catch(const herd::mapper::MappingError&)
 	{
 		spdlog::info("Failed to schedule job for session {} associated to user {}. Invalid Execution Plan", request->session_uuid(), user_id);
 		return {StatusCode::INVALID_ARGUMENT, "Invalid Execution Plan"};
