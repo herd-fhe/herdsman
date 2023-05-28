@@ -87,10 +87,10 @@ add_subdirectory(third-party/spdlog EXCLUDE_FROM_ALL)
 find_package(Threads REQUIRED)
 find_package(OpenMP REQUIRED)
 
-## Herd - proto
+## Herd - libraries
 add_subdirectory(proto)
-
 add_subdirectory(common)
+add_subdirectory(mappers)
 
 # Targets
 
@@ -132,8 +132,6 @@ target_sources(
         src/service/storage_service.cpp
         src/service/execution_service.cpp
 
-        src/mapper/model_proto_mapper.cpp
-
         src/plugins/token_auth_metadata_processor.cpp
 
         include/utils/config.hpp
@@ -159,8 +157,6 @@ target_sources(
         include/service/storage_service.hpp
         include/service/execution_service.hpp
         include/service/i_worker_service.hpp
-
-        include/mapper/model_proto_mapper.hpp
 
         include/service/common_exceptions.hpp
 
@@ -199,6 +195,7 @@ target_link_libraries(
 
         herd_proto
         herd_common
+        herd_dto_mappers
 )
 
 target_include_directories(

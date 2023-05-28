@@ -2,7 +2,9 @@
 
 #include <spdlog/spdlog.h>
 
-#include "mapper/model_proto_mapper.hpp"
+#include "herd/mapper/crypto.hpp"
+#include "herd/mapper/exception.hpp"
+
 #include "service/common_exceptions.hpp"
 #include "utils/controller_utils.hpp"
 
@@ -141,7 +143,7 @@ grpc::Status SessionController::add_key(
 
 	try
 	{
-		const auto type = mapper::to_model(message.options().type());
+		const auto type = herd::mapper::to_model(message.options().type());
 		const auto session_uuid = herd::common::UUID(message.options().session_uuid());
 		const auto size = message.options().size();
 
@@ -190,7 +192,7 @@ grpc::Status SessionController::add_key(
 
 		key_service_.add_key(session_uuid, type, key_data);
 	}
-	catch(const mapper::MappingError&)
+	catch(const herd::mapper::MappingError&)
 	{
 		spdlog::info("Failed to upload key for session {} associated to user {}. Invalid key type", message.options().session_uuid(), user_id);
 		return {StatusCode::INVALID_ARGUMENT, "Invalid type identifier"};
@@ -224,9 +226,9 @@ grpc::Status SessionController::remove_key(
 			return {StatusCode::NOT_FOUND, "Session not found"};
 		}
 
-		key_service_.remove_key(session_uuid, mapper::to_model(request->type()));
+		key_service_.remove_key(session_uuid, herd::mapper::to_model(request->type()));
 	}
-	catch(const mapper::MappingError&)
+	catch(const herd::mapper::MappingError&)
 	{
 		spdlog::info("Failed to delete key for session {} associated to user {}. Invalid key type", request->session_uuid(), user_id);
 		return {StatusCode::INVALID_ARGUMENT, "Invalid session identifier"};
@@ -266,7 +268,7 @@ grpc::Status SessionController::list_keys(
 
 		for(const auto type: key_types)
 		{
-			response->add_type(mapper::to_proto(type));
+			response->add_type(herd::mapper::to_proto(type));
 		}
 	}
 	catch(const std::invalid_argument&)

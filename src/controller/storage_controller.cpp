@@ -2,9 +2,49 @@
 
 #include <spdlog/spdlog.h>
 
-#include "mapper/model_proto_mapper.hpp"
+#include "herd/mapper/crypto.hpp"
+#include "herd/mapper/storage.hpp"
+#include "herd/mapper/exception.hpp"
+
 #include "service/common_exceptions.hpp"
 #include "utils/controller_utils.hpp"
+
+
+namespace
+{
+	google::protobuf::RepeatedPtrField<herd::proto::ColumnDescriptor> to_proto(const herd::common::column_map_type& columns)
+	{
+		assert(std::numeric_limits<uint8_t>::max() >= columns.size() && "Columns limit");
+
+		google::protobuf::RepeatedPtrField<herd::proto::ColumnDescriptor> proto_columns;
+
+		proto_columns.Reserve(static_cast<int>(columns.size()));
+
+		std::vector<std::tuple<std::string, herd::common::DataType, uint8_t>> columns_temp;
+		std::ranges::transform(columns, std::back_inserter(columns_temp),
+							   [](const auto& column)
+							   {
+								   return std::make_tuple(column.first, column.second.type, column.second.index);
+							   }
+		);
+		std::ranges::sort(columns_temp,
+						  [](const auto& rhs, const auto& lhs)
+						  {
+							  return std::get<2>(rhs) < std::get<2>(lhs);
+						  }
+		);
+
+		for (const auto& [name, type, index]: columns_temp)
+		{
+			const auto proto_column = proto_columns.Add();
+			proto_column->set_name(name);
+			proto_column->set_type(herd::mapper::to_proto(type));
+		}
+
+		return proto_columns;
+	}
+}
+
 
 
 StorageController::StorageController(StorageService& storage_service, SessionService& session_service, KeyService& key_service) noexcept
@@ -33,11 +73,11 @@ grpc::Status StorageController::add_data_frame(::grpc::ServerContext* context, :
 
 	try
 	{
-		const auto type = mapper::to_model(message.info().type());
+		const auto type = herd::mapper::to_model(message.info().type());
 		const auto session_uuid = herd::common::UUID(message.info().session_uuid());
 		const auto name = message.info().name();
 		const auto row_count = message.info().row_count();
-		const auto columns = mapper::to_model(message.info().columns());
+		const auto columns = herd::mapper::to_model(message.info().columns());
 
 		if(!session_service_.session_exists_by_uuid(user_id, session_uuid))
 		{
@@ -100,7 +140,7 @@ grpc::Status StorageController::add_data_frame(::grpc::ServerContext* context, :
 
 		storage_service_.mark_data_frame_as_uploaded(session_uuid, data_frame_uuid);
 	}
-	catch(const mapper::MappingError&)
+	catch(const herd::mapper::MappingError&)
 	{
 		spdlog::info("Failed to upload data_frame for session {} associated to user {}. Invalid key type", message.info().session_uuid(), user_id);
 		return {StatusCode::INVALID_ARGUMENT, "Invalid type identifier"};
@@ -181,7 +221,7 @@ grpc::Status StorageController::list_data_frames(::grpc::ServerContext* context,
 		}
 		else
 		{
-			const auto type = mapper::to_model(request->type());
+			const auto type = herd::mapper::to_model(request->type());
 			data_frames = storage_service_.list_session_data_frames(session_uuid, type);
 		}
 
@@ -194,9 +234,9 @@ grpc::Status StorageController::list_data_frames(::grpc::ServerContext* context,
 			frame_proto->set_uuid(data_frame.uuid.as_string());
 			frame_proto->set_name(data_frame.name);
 
-			frame_proto->set_schema_type(mapper::to_proto(data_frame.schema_type));
+			frame_proto->set_schema_type(herd::mapper::to_proto(data_frame.schema_type));
 
-			frame_proto->mutable_columns()->CopyFrom(mapper::to_proto(data_frame.columns));
+			frame_proto->mutable_columns()->CopyFrom(to_proto(data_frame.columns));
 			frame_proto->set_rows_count(data_frame.row_count);
 		}
 	}
