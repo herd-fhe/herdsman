@@ -77,7 +77,14 @@ grpc::Status StorageController::add_data_frame(::grpc::ServerContext* context, :
 		const auto session_uuid = herd::common::UUID(message.info().session_uuid());
 		const auto name = message.info().name();
 		const auto row_count = message.info().row_count();
+		const auto partitions = message.info().partitions();
 		const auto columns = herd::mapper::to_model(message.info().columns());
+
+		if(partitions == 0 || partitions > row_count)
+		{
+			spdlog::info("Invalid partition size");
+			return {StatusCode::INVALID_ARGUMENT, "Invalid partition size"};
+		}
 
 		if(!session_service_.session_exists_by_uuid(user_id, session_uuid))
 		{
@@ -91,7 +98,10 @@ grpc::Status StorageController::add_data_frame(::grpc::ServerContext* context, :
 			return {StatusCode::FAILED_PRECONDITION, "Cloud key not found"};
 		}
 
-		const herd::common::UUID data_frame_uuid = storage_service_.create_data_frame(session_uuid, name, type, columns, row_count);
+		const herd::common::UUID data_frame_uuid = storage_service_.create_data_frame(
+				session_uuid, name,
+				type, columns,
+				row_count, partitions);
 
 		herd::proto::DataFrameAddResponse response;
 		response.mutable_metadata()->set_uuid(data_frame_uuid.as_string());
@@ -99,6 +109,7 @@ grpc::Status StorageController::add_data_frame(::grpc::ServerContext* context, :
 		response.mutable_metadata()->set_schema_type(message.info().type());
 		response.mutable_metadata()->mutable_columns()->CopyFrom(message.info().columns());
 		response.mutable_metadata()->set_rows_count(row_count);
+		response.mutable_metadata()->set_partitions(partitions);
 		stream->Write(response);
 
 		uint32_t received_rows = 0;
@@ -238,6 +249,7 @@ grpc::Status StorageController::list_data_frames(::grpc::ServerContext* context,
 
 			frame_proto->mutable_columns()->CopyFrom(to_proto(data_frame.columns));
 			frame_proto->set_rows_count(data_frame.row_count);
+			frame_proto->set_partitions(data_frame.partitions);
 		}
 	}
 	catch(const std::invalid_argument&)

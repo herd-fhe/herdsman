@@ -19,8 +19,6 @@
 class StorageService
 {
 public:
-	static constexpr std::size_t CHUNK_SIZE = 1024*1024*512; // 0.5 GiB
-
 	struct DataFrameEntry
 	{
 		herd::common::UUID uuid;
@@ -28,15 +26,18 @@ public:
 		herd::common::SchemaType schema_type;
 		herd::common::column_map_type columns;
 
-		std::size_t allocated_chunks;
 		uint32_t row_count;
+		uint32_t partitions;
 		bool uploaded;
 		bool busy;
 	};
 
-	StorageService(std::filesystem::path storage_dir, std::size_t max_chunk_size);
+	StorageService(std::filesystem::path storage_dir);
 
-	herd::common::UUID create_data_frame(const herd::common::UUID& session_uuid, std::string frame_name, herd::common::SchemaType type, const std::vector<herd::common::ColumnMeta>& columns,  uint32_t row_count);
+	herd::common::UUID create_data_frame(
+			const herd::common::UUID& session_uuid, std::string frame_name,
+			herd::common::SchemaType type, const std::vector<herd::common::ColumnMeta>& columns,
+			uint32_t row_count, uint32_t partitions);
 	uint32_t append_to_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid, const uint8_t* data, std::size_t size);
 
 	void mark_data_frame_as_uploaded(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid);
@@ -51,18 +52,23 @@ public:
 	[[nodiscard]] std::vector<StorageService::DataFrameEntry> list_session_data_frames(const herd::common::UUID& session_uuid, herd::common::SchemaType type);
 
 private:
+	struct UploadState
+	{
+			std::size_t current_partition;
+			std::size_t rows_stored_in_partition;
+	};
 
 	mutable std::shared_mutex descriptors_mutex_;
 
 	std::filesystem::path data_frame_storage_dir_;
 	std::multimap<herd::common::UUID, DataFrameEntry> data_frames_;
 
-	std::size_t max_chunk_size_;
+	std::map<herd::common::UUID, UploadState> upload_state_;
 
 	void create_directory_for_session(const herd::common::UUID& session_uuid);
 	void create_directory_for_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid);
 
-	std::ofstream create_chunk_file(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid, const std::string& chunk_name);
+	std::ofstream open_chunk_file(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid, const std::string& chunk_name);
 };
 
 #endif //HERDSMAN_STORAGE_SERVICE_HPP

@@ -89,7 +89,7 @@ int main()
 	AuthService auth_service(paseto_key, std::chrono::seconds(config.security.token_lifetime));
 	SessionService session_service;
 	KeyService key_service;
-	StorageService storage_service("./", 1024*1024*128);
+	StorageService storage_service("./");
 	ExecutionService execution_service(key_service, storage_service);
 
 	const auto executor = std::make_shared<executor::Executor>(execution_service);
