@@ -47,10 +47,13 @@ namespace
 
 	Config::ServerConfig load_server_config(const YAML::Node& node)
 	{
-		Config::ServerConfig server_config{};
+		Config::ServerConfig server_config;
 
-		server_config.address = get_optional_value<std::string>(node, "address", "0.0.0.0");
-		server_config.port = get_optional_value<uint16_t>(node, "port", 5000);
+		server_config.listen_address.hostname = get_optional_value<std::string>(node, "hostname", "0.0.0.0");
+		server_config.listen_address.port = get_optional_value<uint16_t>(node, "port", 5000);
+
+		server_config.key_directory = get_optional_value<std::string>(node, "key_directory", "./");
+		server_config.storage_directory = get_optional_value<std::string>(node, "storage_directory", "./");
 
 		return server_config;
 	}
@@ -103,6 +106,43 @@ namespace
 
 		return logging_config;
 	}
+
+	Config::GrpcWorkersConfig load_grpc_workers_config(const YAML::Node& node)
+	{
+		Config::GrpcWorkersConfig config{};
+
+		const auto addresses = node["addresses"];
+		if(!addresses)
+		{
+			throw std::runtime_error("No worker address provided");
+		}
+
+		for(auto iter = std::cbegin(addresses); iter != std::cend(addresses); ++iter)
+		{
+			const auto address_node = iter->as<YAML::Node>();
+			const auto hostname = get_value<std::string>(address_node, "hostname");
+			const auto port = get_value<uint16_t>(address_node, "port");
+
+			config.addresses.emplace_back(hostname, port);
+		}
+
+		return config;
+	}
+
+	Config::workers_config_t load_workers_config(const YAML::Node& node)
+	{
+		Config::workers_config_t workers_config;
+		if (const auto grpc_node = node["grpc"]; grpc_node)
+		{
+			workers_config = load_grpc_workers_config(grpc_node);
+		}
+		else
+		{
+			throw std::runtime_error("No workers configuration");
+		}
+
+		return workers_config;
+	}
 }
 
 Config load_config(const std::filesystem::path &path)
@@ -150,6 +190,16 @@ Config load_config(const std::filesystem::path &path)
 		config.logging = Config::LoggingConfig{
 			Config::LoggingConfig::LogLevel::INFO
 		};
+	}
+
+	if(const auto node = root_node["workers"]; node)
+	{
+		config.workers = load_workers_config(node);
+	}
+	else
+	{
+		spdlog::error("Failed to read workers config");
+		throw std::runtime_error("Failed to read workers config");
 	}
 
 	return config;

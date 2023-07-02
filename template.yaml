@@ -1,7 +1,15 @@
 ---
 server:
-  address: localhost
+  hostname: localhost
   port: 5000
+  key_directory: "./"
+  storage_directory: "./"
 
 security:
   secret_key: "Nzc4MzM0ZjU0MmEwYmQ2MGM2OTA1ZjFjNDg1YTMxODk"
+
+workers:
+  grpc:
+    addresses:
+      - hostname: localhost
+        port: 5001

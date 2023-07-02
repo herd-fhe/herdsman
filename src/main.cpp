@@ -10,7 +10,7 @@
 
 #include "plugins/token_auth_metadata_processor.hpp"
 
-#include "utils/executor/executor.hpp"
+#include "execution/executor/executor.hpp"
 
 #include "service/auth_service.hpp"
 #include "service/session_service.hpp"
@@ -21,6 +21,7 @@
 #include "controller/execution_controller.hpp"
 #include "controller/session_controller.hpp"
 #include "controller/storage_controller.hpp"
+#include "execution/worker/grpc_worker_group.hpp"
 
 
 std::shared_ptr<grpc::ServerCredentials> build_server_credentials(
@@ -61,6 +62,19 @@ std::shared_ptr<grpc::ServerCredentials> build_server_credentials(
 	}
 }
 
+std::unique_ptr<IWorkerGroup> build_worker_group(const Config::workers_config_t& workers_config)
+{
+	if(std::holds_alternative<Config::GrpcWorkersConfig>(workers_config))
+	{
+		const auto& grpc_workers_config = std::get<Config::GrpcWorkersConfig>(workers_config);
+		return std::make_unique<GrpcWorkerGroup>(grpc_workers_config.addresses);
+	}
+
+	assert(false && "Invalid configuration");
+
+	return nullptr;
+}
+
 void init_global_logger(const Config::LoggingConfig& config)
 {
 	using enum Config::LoggingConfig::LogLevel;
@@ -84,15 +98,21 @@ int main()
 	init_global_logger(config.logging);
 
 	const paseto_key_type paseto_key = init_paseto(config.security.secret_key);
-	const std::string address = config.server.address + ":" + std::to_string(config.server.port);
+	const std::string address = config.server.listen_address.hostname + ":" + std::to_string(config.server.listen_address.port);
 
 	AuthService auth_service(paseto_key, std::chrono::seconds(config.security.token_lifetime));
 	SessionService session_service;
-	KeyService key_service;
-	StorageService storage_service("./");
+	KeyService key_service(config.server.key_directory);
+	StorageService storage_service(config.server.storage_directory);
 	ExecutionService execution_service(key_service, storage_service);
 
+
 	const auto executor = std::make_shared<executor::Executor>(execution_service);
+	{
+			auto worker_group = build_worker_group(config.workers);
+			executor->set_worker_group(std::move(worker_group));
+	}
+
 	execution_service.set_executor(executor);
 
 	const auto credentials = build_server_credentials(config.security, auth_service);
@@ -117,7 +137,7 @@ int main()
 	spdlog::debug("Execution controller created");
 
 	auto server = builder.BuildAndStart();
-	spdlog::info("Server listening on address: {}", address);
+	spdlog::info("Server listening on hostname: {}", address);
 	server->Wait();
 
 	return 0;

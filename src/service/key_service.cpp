@@ -10,6 +10,9 @@
 
 namespace fs = std::filesystem;
 
+KeyService::KeyService(std::filesystem::path key_dir)
+:	key_storage_dir_(key_dir)
+{}
 
 void KeyService::add_key(const herd::common::UUID& session_uuid, herd::common::SchemaType type, const std::vector<std::byte>& key_data)
 {

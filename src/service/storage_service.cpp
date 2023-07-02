@@ -70,7 +70,7 @@ std::vector<StorageService::DataFrameEntry> StorageService::list_session_data_fr
 herd::common::UUID StorageService::create_data_frame(
 		const herd::common::UUID& session_uuid, std::string frame_name,
 		herd::common::SchemaType type, const std::vector<herd::common::ColumnMeta>& columns,
-		uint32_t row_count, uint32_t partitions)
+		uint64_t row_count, uint32_t partitions)
 {
 	std::unique_lock lock(descriptors_mutex_);
 
@@ -96,7 +96,7 @@ herd::common::UUID StorageService::create_data_frame(
 	return entry.uuid;
 }
 
-uint32_t StorageService::append_to_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid, const uint8_t* data, std::size_t size)
+uint64_t StorageService::append_to_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid, const uint8_t* data, std::size_t size)
 {
 	std::unique_lock lock(descriptors_mutex_);
 
@@ -116,10 +116,10 @@ uint32_t StorageService::append_to_data_frame(const herd::common::UUID& session_
 
 	const auto& data_frame_entry = data_frame_iter->second;
 	auto& upload_state = upload_state_[data_frame_entry.uuid];
-	uint32_t rows_read = 0;
+	uint64_t rows_read = 0;
 
-	const uint32_t chunk_row_count = data_frame_entry.row_count / data_frame_entry.partitions;
-	const uint32_t remainder_count = data_frame_entry.row_count % data_frame_entry.partitions;
+	const uint64_t chunk_row_count = data_frame_entry.row_count / data_frame_entry.partitions;
+	const uint64_t remainder_count = data_frame_entry.row_count % data_frame_entry.partitions;
 
 
 	auto byte_iter = reinterpret_cast<const std::byte*>(data);
@@ -317,4 +317,40 @@ void StorageService::remove_data_frame(const herd::common::UUID& session_uuid, c
 	std::filesystem::remove_all(chunks_path);
 
 	data_frames_.erase(data_frame_iter);
+}
+
+uint64_t StorageService::get_partition_size(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid, uint32_t partition)
+{
+	const auto data_frame_opt = get_data_frame(session_uuid, uuid);
+	assert(data_frame_opt.has_value());
+
+	const auto& data_frame = data_frame_opt.value();
+
+	const uint64_t chunk_row_count = data_frame.row_count / data_frame.partitions;
+	const uint64_t remainder_count = data_frame.row_count % data_frame.partitions;
+
+	return chunk_row_count + (partition < remainder_count ? 1 : 0);
+}
+
+std::optional<StorageService::DataFrameEntry> StorageService::get_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid) const
+{
+	std::shared_lock lock(descriptors_mutex_);
+
+	auto [iter_begin, iter_end] = data_frames_.equal_range(session_uuid);
+	auto data_frame_iter = std::find_if(
+			iter_begin, iter_end,
+			[&uuid](const auto& entry)
+			{
+				return entry.second.uuid == uuid;
+			}
+	);
+
+	if(data_frame_iter != iter_end)
+	{
+		return data_frame_iter->second;
+	}
+	else
+	{
+		return std::nullopt;
+	}
 }

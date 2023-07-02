@@ -26,7 +26,7 @@ public:
 		herd::common::SchemaType schema_type;
 		herd::common::column_map_type columns;
 
-		uint32_t row_count;
+		uint64_t row_count;
 		uint32_t partitions;
 		bool uploaded;
 		bool busy;
@@ -37,8 +37,8 @@ public:
 	herd::common::UUID create_data_frame(
 			const herd::common::UUID& session_uuid, std::string frame_name,
 			herd::common::SchemaType type, const std::vector<herd::common::ColumnMeta>& columns,
-			uint32_t row_count, uint32_t partitions);
-	uint32_t append_to_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid, const uint8_t* data, std::size_t size);
+			uint64_t row_count, uint32_t partitions);
+	uint64_t append_to_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid, const uint8_t* data, std::size_t size);
 
 	void mark_data_frame_as_uploaded(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid);
 	void lock_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid);
@@ -48,8 +48,12 @@ public:
 
 	void remove_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid);
 
-	[[nodiscard]] std::vector<StorageService::DataFrameEntry> list_session_data_frames(const herd::common::UUID& session_uuid);
-	[[nodiscard]] std::vector<StorageService::DataFrameEntry> list_session_data_frames(const herd::common::UUID& session_uuid, herd::common::SchemaType type);
+	[[nodiscard]] std::optional<DataFrameEntry> get_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid) const;
+
+	[[nodiscard]] std::vector<DataFrameEntry> list_session_data_frames(const herd::common::UUID& session_uuid);
+	[[nodiscard]] std::vector<DataFrameEntry> list_session_data_frames(const herd::common::UUID& session_uuid, herd::common::SchemaType type);
+
+	[[nodiscard]] uint64_t get_partition_size(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid, uint32_t partition);
 
 private:
 	struct UploadState
