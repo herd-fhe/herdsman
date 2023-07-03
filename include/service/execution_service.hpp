@@ -37,8 +37,8 @@ public:
 		uint32_t partition;
 		State state = State::WAITING;
 
-		explicit StageTask(uint32_t partition)
-		:	partition(partition)
+		explicit StageTask(uint32_t task_partition)
+		:	partition(task_partition)
 		{};
 	};
 
@@ -51,13 +51,12 @@ public:
 	struct JobDescriptor
 	{
 		JobDescriptor(
-				const herd::common::UUID& uuid,
-				herd::common::JobStatus status,
-				herd::common::ExecutionPlan plan
-		)
-		: 	uuid(uuid),
-			status(status),
-			plan(std::move(plan))
+				const herd::common::UUID& job_uuid,
+				herd::common::JobStatus job_status,
+				herd::common::ExecutionPlan job_plan)
+		: 	uuid(job_uuid),
+			status(job_status),
+			plan(std::move(job_plan))
 		{}
 
 		herd::common::UUID uuid;
@@ -114,7 +113,7 @@ private:
 	const JobDescriptor& get_job_descriptor(const herd::common::UUID& session_uuid, const herd::common::UUID& job_uuid) const;
 	JobDescriptor& get_job_descriptor(const herd::common::UUID& session_uuid, const herd::common::UUID& job_uuid);
 
-	void initialize_job(const herd::common::UUID& session_uuid, ExecutionService::JobDescriptor& descriptor);
+	void initialize_job(const herd::common::UUID& dependant_node, ExecutionService::JobDescriptor& descriptor);
 	void recalculate_waiting_tasks(JobDescriptor& descriptor);
 
 	herd::common::task_t prepare_task(const JobDescriptor& descriptor, const TaskKey& key) const;

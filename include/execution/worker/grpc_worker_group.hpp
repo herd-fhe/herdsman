@@ -42,8 +42,8 @@ private:
 		std::shared_ptr<grpc::Channel> channel;
 		std::unique_ptr<herd::proto::Worker::Stub> stub;
 
-		Worker(std::shared_ptr<grpc::Channel> channel, std::unique_ptr<herd::proto::Worker::Stub> stub)
-		:	channel(std::move(channel)), stub(std::move(stub))
+		Worker(std::shared_ptr<grpc::Channel> worker_channel, std::unique_ptr<herd::proto::Worker::Stub> worker_stub)
+		:	channel(std::move(worker_channel)), stub(std::move(worker_stub))
 		{}
 	};
 

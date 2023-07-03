@@ -348,9 +348,9 @@ void ExecutionService::initialize_job(const herd::common::UUID& session_uuid, Ex
 
 		const bool all_dependencies_visited = std::ranges::all_of(
 				node.parents(),
-				[&visited](const auto& node)
+				[&visited](const auto& dependency_node)
 				{
-					return visited.contains(node.node_id());
+					return visited.contains(dependency_node.node_id());
 				}
 		);
 		if(!all_dependencies_visited)
@@ -359,7 +359,7 @@ void ExecutionService::initialize_job(const herd::common::UUID& session_uuid, Ex
 		}
 
 		visited.emplace(node.node_id());
-		std::ranges::for_each(node.children(), [&visit_queue](const auto& node){ visit_queue.emplace(node); });
+		std::ranges::for_each(node.children(), [&visit_queue](const auto& dependant_node){ visit_queue.emplace(dependant_node); });
 
 		if(std::holds_alternative<herd::common::InputStage>(node.value()))
 		{
