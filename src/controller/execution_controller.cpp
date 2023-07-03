@@ -42,10 +42,6 @@ grpc::Status ExecutionController::get_job_state(::grpc::ServerContext* context, 
 
 		response->set_uuid(state.uuid.as_string());
 		response->set_status(herd::mapper::to_proto(state.status));
-		if(state.current_stage.has_value())
-		{
-			response->set_current_stage(state.current_stage.value());
-		}
 		if(state.message.has_value())
 		{
 			response->set_message(state.message.value());
@@ -85,10 +81,6 @@ grpc::Status ExecutionController::list_jobs(::grpc::ServerContext* context, cons
 			const auto state_proto = states_proto->Add();
 			state_proto->set_uuid(state.uuid.as_string());
 			state_proto->set_status(herd::mapper::to_proto(state.status));
-			if(state.current_stage.has_value())
-			{
-				state_proto->set_current_stage(state.current_stage.value());
-			}
 
 			if(state.message.has_value())
 			{

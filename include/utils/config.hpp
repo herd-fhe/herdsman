@@ -4,14 +4,19 @@
 #include <cstdint>
 #include <filesystem>
 #include <optional>
+#include <vector>
+#include <variant>
+
+#include "address.hpp"
 
 
 struct Config
 {
 	struct ServerConfig
 	{
-		std::string address;
-		uint16_t port{};
+		Address listen_address;
+		std::string key_directory;
+		std::string storage_directory;
 	};
 
 	struct SecurityConfig
@@ -42,9 +47,17 @@ struct Config
 		LogLevel level;
 	};
 
+	struct GrpcWorkersConfig
+	{
+		std::vector<Address> addresses;
+	};
+
+	using workers_config_t = std::variant<GrpcWorkersConfig>;
+
 	ServerConfig server;
 	SecurityConfig security;
 	LoggingConfig logging;
+	workers_config_t workers;
 };
 
 

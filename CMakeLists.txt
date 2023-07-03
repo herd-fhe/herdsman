@@ -118,8 +118,8 @@ target_sources(
         src/utils/file_utils.cpp
         src/utils/controller_utils.cpp
 
-        src/utils/executor/executor.cpp
-        src/utils/execution_plan/execution_plan_analyzer.cpp
+        src/execution/executor/executor.cpp
+        src/execution/execution_plan/execution_plan_analyzer.cpp
 
         src/controller/auth_controller.cpp
         src/controller/session_controller.cpp
@@ -132,19 +132,25 @@ target_sources(
         src/service/storage_service.cpp
         src/service/execution_service.cpp
 
+        src/execution/worker/i_worker_group.cpp
+        src/execution/worker/grpc_worker_group.cpp
+
         src/plugins/token_auth_metadata_processor.cpp
 
+        include/model/task.hpp
+
         include/utils/config.hpp
+        include/utils/address.hpp
         include/utils/paseto_utils.hpp
         include/utils/string_utils.hpp
         include/utils/file_utils.hpp
         include/utils/controller_utils.hpp
 
-        include/utils/executor/i_executor.hpp
-        include/utils/executor/executor.hpp
-        include/utils/executor/event/job_scheduled.hpp
-        include/utils/executor/event/event.hpp
-        include/utils/execution_plan/execution_plan_analyzer.hpp
+        include/execution/executor/i_executor.hpp
+        include/execution/executor/executor.hpp
+        include/execution/executor/event/job_scheduled.hpp
+        include/execution/executor/event/event.hpp
+        include/execution/execution_plan/execution_plan_analyzer.hpp
 
         include/controller/auth_controller.hpp
         include/controller/session_controller.hpp
@@ -156,7 +162,9 @@ target_sources(
         include/service/key_service.hpp
         include/service/storage_service.hpp
         include/service/execution_service.hpp
-        include/service/i_worker_service.hpp
+
+        include/execution/worker/i_worker_group.hpp
+        include/execution/worker/grpc_worker_group.hpp
 
         include/service/common_exceptions.hpp
 

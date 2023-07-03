@@ -1,5 +1,7 @@
 #include "service/key_service.hpp"
 
+#include <utility>
+
 #include "spdlog/spdlog.h"
 
 #include "herd/common/model/schema_type.hpp"
@@ -10,6 +12,9 @@
 
 namespace fs = std::filesystem;
 
+KeyService::KeyService(std::filesystem::path key_dir)
+:	key_storage_dir_(std::move(key_dir))
+{}
 
 void KeyService::add_key(const herd::common::UUID& session_uuid, herd::common::SchemaType type, const std::vector<std::byte>& key_data)
 {

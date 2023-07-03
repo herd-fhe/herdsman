@@ -112,7 +112,7 @@ grpc::Status StorageController::add_data_frame(::grpc::ServerContext* context, :
 		response.mutable_metadata()->set_partitions(partitions);
 		stream->Write(response);
 
-		uint32_t received_rows = 0;
+		uint64_t received_rows = 0;
 
 		while(stream->Read(&message))
 		{
