@@ -10,18 +10,19 @@ namespace
 {
 	herd::common::DataType map_data_width_to_type(unsigned int width)
 	{
+		using enum herd::common::DataType;
 		switch(width)
 		{
 			case 1:
-				return herd::common::DataType::BIT;
+				return BIT;
 			case 8:
-				return herd::common::DataType::UINT8;
+				return UINT8;
 			case 16:
-				return herd::common::DataType::UINT16;
+				return UINT16;
 			case 32:
-				return herd::common::DataType::UINT32;
+				return UINT32;
 			case 64:
-				return herd::common::DataType::UINT64;
+				return UINT64;
 			default:
 				assert(false && "Unsupported type");
 				return static_cast<herd::common::DataType>(0);
@@ -178,9 +179,8 @@ std::optional<TaskKey> ExecutionService::get_next_for_execution()
 	}
 
 	const auto& [session_uuid, job] = pending_jobs_.front();
-	auto& pending_stages = job->pending_stages;
 
-	for(auto& stage_progress: pending_stages)
+	for(auto& stage_progress: job->pending_stages)
 	{
 		for(auto& task: stage_progress.pending_tasks)
 		{
@@ -284,7 +284,7 @@ herd::common::task_t ExecutionService::build_map_task(const JobDescriptor& descr
 	};
 }
 
-herd::common::task_t ExecutionService::task_for_task_key(TaskKey key) const
+herd::common::task_t ExecutionService::task_for_task_key(const TaskKey& key) const
 {
 	std::shared_lock lock(jobs_mutex_);
 
@@ -292,29 +292,14 @@ herd::common::task_t ExecutionService::task_for_task_key(TaskKey key) const
 	return prepare_task(job, key);
 }
 
-void ExecutionService::mark_task_completed(TaskKey key)
+void ExecutionService::mark_task_completed(const TaskKey& key)
 {
 	std::unique_lock lock(jobs_mutex_);
 
 	auto& job = get_job_descriptor(key.session_uuid, key.job_uuid);
-	auto stage_iter = std::ranges::find_if(
-			job.pending_stages,
-			[node_id = key.stage_node_id](const StageProgress& progress)
-			{
-				return progress.stage_node.node_id() == node_id;
-			}
-	);
-	assert(stage_iter != std::end(job.pending_stages));
-	auto task_iter = std::ranges::find_if(
-			stage_iter->pending_tasks,
-			[partition = key.partition](const StageTask& task)
-			{
-				return task.partition == partition;
-			}
-	);
-	assert(task_iter != std::end(stage_iter->pending_tasks));
+	auto& task = get_task(job, key.stage_node_id, key.partition);
 
-	task_iter->state = StageTask::State::COMPLETED;
+	task.state = StageTask::State::COMPLETED;
 
 	recalculate_waiting_tasks(job);
 
@@ -462,11 +447,11 @@ void ExecutionService::recalculate_waiting_tasks(ExecutionService::JobDescriptor
 
 	// start stages with resolved dependencies
 	std::vector<std::size_t> starting_stages;
-	for(const auto& entry: descriptor.dependency_lookup)
+	for(const auto& [stage_id, dependencies]: descriptor.dependency_lookup)
 	{
-		if(entry.second == 0)
+		if(dependencies == 0)
 		{
-			starting_stages.emplace_back(entry.first);
+			starting_stages.emplace_back(stage_id);
 		}
 	}
 
@@ -498,28 +483,35 @@ void ExecutionService::recalculate_waiting_tasks(ExecutionService::JobDescriptor
 	}
 }
 
-void ExecutionService::mark_task_failed(TaskKey key)
+void ExecutionService::mark_task_failed(const TaskKey& key)
 {
 	std::unique_lock lock(jobs_mutex_);
 
 	auto& job = get_job_descriptor(key.session_uuid, key.job_uuid);
+	auto& task = get_task(job, key.stage_node_id, key.partition);
+
+	task.state = StageTask::State::FAILED;
+	job.status = herd::common::JobStatus::FAILED;
+}
+
+ExecutionService::StageTask& ExecutionService::get_task(ExecutionService::JobDescriptor& descriptor, std::size_t stage_node_id, uint32_t partition)
+{
 	auto stage_iter = std::ranges::find_if(
-			job.pending_stages,
-			[node_id = key.stage_node_id](const StageProgress& progress)
+			descriptor.pending_stages,
+			[stage_node_id](const StageProgress& progress)
 			{
-				return progress.stage_node.node_id() == node_id;
+				return progress.stage_node.node_id() == stage_node_id;
 			}
 	);
-	assert(stage_iter != std::end(job.pending_stages));
+	assert(stage_iter != std::end(descriptor.pending_stages));
 	auto task_iter = std::ranges::find_if(
 			stage_iter->pending_tasks,
-			[partition = key.partition](const StageTask& task)
+			[partition](const StageTask& task)
 			{
 				return task.partition == partition;
 			}
 	);
 	assert(task_iter != std::end(stage_iter->pending_tasks));
 
-	task_iter->state = StageTask::State::FAILED;
-	job.status = herd::common::JobStatus::FAILED;
+	return *task_iter;
 }

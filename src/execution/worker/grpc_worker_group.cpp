@@ -43,8 +43,7 @@ void GrpcWorkerGroup::thread_body(GrpcWorkerGroup& worker_group)
 
 	while(true)
 	{
-		bool closed = !worker_group.completion_queue.Next(std::bit_cast<void**>(&tag), &ok);
-		if(closed)
+		if(!worker_group.completion_queue.Next(std::bit_cast<void**>(&tag), &ok))
 		{
 			return;
 		}
@@ -94,19 +93,20 @@ size_t GrpcWorkerGroup::concurrent_workers() const noexcept
 
 IWorkerGroup::TaskHandle::Status GrpcWorkerGroup::GrpcTaskHandle::status() const noexcept
 {
+	using enum Status;
 	if(!completed())
 	{
-		return Status::PENDING;
+		return PENDING;
 	}
 	else
 	{
 		if(status_.ok())
 		{
-			return Status::COMPLETED;
+			return COMPLETED;
 		}
 		else
 		{
-			return Status::ERROR;
+			return ERROR;
 		}
 	}
 }

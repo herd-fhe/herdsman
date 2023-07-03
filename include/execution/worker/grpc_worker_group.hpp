@@ -11,10 +11,10 @@
 #include "utils/address.hpp"
 
 
-class GrpcWorkerGroup: public IWorkerGroup
+class GrpcWorkerGroup final: public IWorkerGroup
 {
 public:
-	class GrpcTaskHandle: public TaskHandle
+	class GrpcTaskHandle final: public TaskHandle
 	{
 	public:
 		Status status() const noexcept override;
@@ -31,7 +31,7 @@ public:
 	};
 
 	explicit GrpcWorkerGroup(const std::vector<Address>& worker_addresses);
-	~GrpcWorkerGroup();
+	~GrpcWorkerGroup() override;
 
 	std::shared_ptr<TaskHandle> schedule_task(const herd::common::task_t& task) override;
 	size_t concurrent_workers() const noexcept override;

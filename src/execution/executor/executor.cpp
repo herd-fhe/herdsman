@@ -79,7 +79,7 @@ namespace executor
 		}
 	}
 
-	void Executor::schedule_task_on_worker(TaskKey key)
+	void Executor::schedule_task_on_worker(const TaskKey& key)
 	{
 		const auto task = execution_service_.task_for_task_key(key);
 		auto task_handle = worker_group_->schedule_task(task);

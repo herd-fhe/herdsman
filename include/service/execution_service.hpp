@@ -92,10 +92,10 @@ public:
 	void set_executor(std::shared_ptr<executor::IExecutor> executor) noexcept;
 
 	[[nodiscard]] std::optional<TaskKey> get_next_for_execution();
-	[[nodiscard]] herd::common::task_t task_for_task_key(TaskKey key) const;
+	[[nodiscard]] herd::common::task_t task_for_task_key(const TaskKey& key) const;
 
-	void mark_task_completed(TaskKey key);
-	void mark_task_failed(TaskKey key);
+	void mark_task_completed(const TaskKey& key);
+	void mark_task_failed(const TaskKey& key);
 
 private:
 	KeyService& key_service_;
@@ -112,6 +112,7 @@ private:
 	void lock_required_resources(const herd::common::UUID& session_uuid, const execution_plan::ResourceRequirements& requirements);
 	const JobDescriptor& get_job_descriptor(const herd::common::UUID& session_uuid, const herd::common::UUID& job_uuid) const;
 	JobDescriptor& get_job_descriptor(const herd::common::UUID& session_uuid, const herd::common::UUID& job_uuid);
+	StageTask& get_task(JobDescriptor& descriptor, std::size_t stage_node_id, uint32_t partition);
 
 	void initialize_job(const herd::common::UUID& dependant_node, ExecutionService::JobDescriptor& descriptor);
 	void recalculate_waiting_tasks(JobDescriptor& descriptor);

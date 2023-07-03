@@ -11,13 +11,13 @@
 
 namespace executor
 {
-	class Executor: public IExecutor
+	class Executor final: public IExecutor
 	{
 	public:
 		constexpr static std::size_t RETRY_LIMIT = 3;
 
 		explicit Executor(ExecutionService& execution_service) noexcept;
-		~Executor();
+		~Executor() override;
 
 		void send_event(ExecutorEvent event) override;
 		void set_worker_group(std::unique_ptr<IWorkerGroup> worker_group) noexcept;
@@ -40,7 +40,7 @@ namespace executor
 
 		static void thread_body(Executor& executor);
 
-		void schedule_task_on_worker(TaskKey key);
+		void schedule_task_on_worker(const TaskKey& key);
 		void schedule_tasks_on_workers();
 
 		void handle_job_scheduled(const event::JobScheduled& event);

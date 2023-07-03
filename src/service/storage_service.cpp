@@ -319,7 +319,7 @@ void StorageService::remove_data_frame(const herd::common::UUID& session_uuid, c
 	data_frames_.erase(data_frame_iter);
 }
 
-uint64_t StorageService::get_partition_size(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid, uint32_t partition)
+uint64_t StorageService::get_partition_size(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid, uint32_t partition) const
 {
 	const auto data_frame_opt = get_data_frame(session_uuid, uuid);
 	assert(data_frame_opt.has_value());

@@ -20,7 +20,7 @@ public:
 		uint32_t locks;
 	};
 
-	KeyService(std::filesystem::path key_dir);
+	explicit KeyService(std::filesystem::path  key_dir);
 
 	void add_key(const herd::common::UUID& session_uuid, herd::common::SchemaType type, const std::vector<std::byte>& key_data);
 	void remove_key(const herd::common::UUID& session_uuid, herd::common::SchemaType type);
