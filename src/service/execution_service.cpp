@@ -6,30 +6,6 @@
 #include <cassert>
 
 
-namespace
-{
-	herd::common::DataType map_data_width_to_type(unsigned int width)
-	{
-		using enum herd::common::DataType;
-		switch(width)
-		{
-			case 1:
-				return BIT;
-			case 8:
-				return UINT8;
-			case 16:
-				return UINT16;
-			case 32:
-				return UINT32;
-			case 64:
-				return UINT64;
-			default:
-				assert(false && "Unsupported type");
-				return static_cast<herd::common::DataType>(0);
-		}
-	}
-}
-
 ExecutionService::ExecutionService(KeyService& key_service, StorageService& storage_service)
 	: key_service_(key_service), storage_service_(storage_service)
 {
@@ -370,7 +346,8 @@ void ExecutionService::initialize_job(const herd::common::UUID& session_uuid, Ex
 				columns.reserve(mapper_stage.circuit.output.size());
 				for(std::size_t i = 0; i < mapper_stage.circuit.output.size(); ++i)
 				{
-					columns.emplace_back("temp-" + std::to_string(i), map_data_width_to_type(mapper_stage.circuit.output[i]));
+					const auto& output_column = mapper_stage.circuit.output[i];
+					columns.emplace_back(output_column.name, output_column.data_type);
 				}
 
 				const auto intermediate_data_frame = storage_service_.create_data_frame(
