@@ -30,22 +30,42 @@ public:
 		enum class State
 		{
 			WAITING,
+			BLOCKED,
 			PENDING,
 			COMPLETED,
 			FAILED
 		};
 		uint32_t partition;
-		State state = State::WAITING;
+		State state;
 
-		explicit StageTask(uint32_t task_partition)
-		:	partition(task_partition)
+		StageTask(uint32_t task_partition, State task_state=State::WAITING)
+		:	partition(task_partition), state(task_state)
 		{};
 	};
+
+	struct ReduceStageState
+	{
+		std::optional<std::tuple<herd::common::UUID, uint64_t, uint32_t>> hidden_stage_output;
+	};
+
+	using stage_state_t = std::variant<std::monostate, ReduceStageState>;
 
 	struct StageProgress
 	{
 		herd::common::DAG<herd::common::stage_t>::Node<true> stage_node;
+		std::tuple<herd::common::UUID, uint64_t, uint32_t> stage_output;
+
 		std::vector<StageTask> pending_tasks;
+
+		stage_state_t state;
+
+		StageProgress(
+				herd::common::DAG<herd::common::stage_t>::Node<true> progress_stage_node,
+				std::tuple<herd::common::UUID, uint64_t, uint32_t> progress_stage_output,
+				stage_state_t progress_state
+		)
+		: stage_node(std::move(progress_stage_node)), stage_output(std::move(progress_stage_output)), state(std::move(progress_state))
+		{}
 	};
 
 	struct JobDescriptor
@@ -60,9 +80,9 @@ public:
 		{}
 
 		herd::common::UUID uuid;
-		std::vector<StageProgress> pending_stages{};
+		std::vector<std::size_t> pending_stage_ids{};
 		std::unordered_map<std::size_t, std::size_t> dependency_lookup;
-		std::map<std::size_t, std::tuple<herd::common::UUID, uint64_t, uint32_t>> intermediate_stage_outputs{};
+		std::map<std::size_t, StageProgress> stage_progress{};
 		herd::common::JobStatus status;
 
 		herd::common::ExecutionPlan plan;
@@ -115,10 +135,28 @@ private:
 	StageTask& get_task(JobDescriptor& descriptor, std::size_t stage_node_id, uint32_t partition);
 
 	void initialize_job(const herd::common::UUID& dependant_node, ExecutionService::JobDescriptor& descriptor);
+	void initialize_input_stage(
+			const herd::common::DAG<herd::common::stage_t>::Node<true>& stage_node,
+			ExecutionService::JobDescriptor& descriptor, const herd::common::UUID& session_uuid
+	);
+	void initialize_output_stage(
+			const herd::common::DAG<herd::common::stage_t>::Node<true>& stage_node,
+			ExecutionService::JobDescriptor& descriptor
+	);
+	void initialize_map_stage(
+			const herd::common::DAG<herd::common::stage_t>::Node<true>& stage_node,
+			ExecutionService::JobDescriptor& descriptor, const herd::common::UUID& session_uuid
+	);
+	void initialize_reduce_stage(
+			const herd::common::DAG<herd::common::stage_t>::Node<true>& stage_node,
+			ExecutionService::JobDescriptor& descriptor, const herd::common::UUID& session_uuid
+	);
+
 	void recalculate_waiting_tasks(JobDescriptor& descriptor);
 
 	herd::common::task_t prepare_task(const JobDescriptor& descriptor, const TaskKey& key) const;
 	herd::common::task_t build_map_task(const JobDescriptor& descriptor, const TaskKey& key) const;
+	herd::common::task_t build_reduce_task(const JobDescriptor& descriptor, const TaskKey& key) const;
 };
 
 #endif //HERDSMAN_EXECUTION_SERVICE_HPP

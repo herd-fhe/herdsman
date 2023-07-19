@@ -78,6 +78,15 @@ std::shared_ptr<IWorkerGroup::TaskHandle> GrpcWorkerGroup::schedule_task(const h
 		handle->rpc_ = std::move(remote_call);
 		spdlog::info("Mapper task scheduled on worker: {}", current_worker_);
 	}
+	else if(std::holds_alternative<herd::common::ReduceTask>(task))
+	{
+		const auto& reduce_task = std::get<herd::common::ReduceTask>(task);
+		const auto reduce_task_proto = herd::mapper::to_proto(reduce_task);
+		auto remote_call = worker.stub->Asyncreduce(&handle->context_, reduce_task_proto, &completion_queue);
+		remote_call->Finish(&handle->response_, &handle->status_, std::bit_cast<void*>(tag));
+		handle->rpc_ = std::move(remote_call);
+		spdlog::info("Reduce task scheduled on worker: {}", current_worker_);
+	}
 
 	statuses_.try_emplace(tag, handle);
 

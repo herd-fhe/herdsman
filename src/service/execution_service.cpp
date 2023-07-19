@@ -156,8 +156,9 @@ std::optional<TaskKey> ExecutionService::get_next_for_execution()
 
 	const auto& [session_uuid, job] = pending_jobs_.front();
 
-	for(auto& stage_progress: job->pending_stages)
+	for(const auto stage_progress_id: job->pending_stage_ids)
 	{
+		auto& stage_progress = job->stage_progress.at(stage_progress_id);
 		for(auto& task: stage_progress.pending_tasks)
 		{
 			if(task.state == StageTask::State::WAITING)
@@ -216,6 +217,10 @@ herd::common::task_t ExecutionService::prepare_task(const JobDescriptor& descrip
 	{
 		return build_map_task(descriptor, key);
 	}
+	else if(std::holds_alternative<herd::common::ReduceStage>(stage))
+	{
+		return build_reduce_task(descriptor, key);
+	}
 	else
 	{
 		throw std::runtime_error("Not implemented yet");
@@ -229,22 +234,22 @@ herd::common::task_t ExecutionService::build_map_task(const JobDescriptor& descr
 
 	const auto parent_stage_nodes = stage_node.parents();
 	assert(parent_stage_nodes.size() == 1);
-	const auto parent_data_frame = std::get<0>(descriptor.intermediate_stage_outputs.at(parent_stage_nodes[0].node_id()));
-	const auto parent_row_count = storage_service_.get_partition_size(key.session_uuid, parent_data_frame, key.partition);
+	const auto& [parent_uuid, parent_row_count, parent_partitions] = descriptor.stage_progress.at(parent_stage_nodes[0].node_id()).stage_output;
+	const auto parent_partition_row_count = storage_service_.get_partition_size(key.session_uuid, parent_uuid, key.part);
 
-	const auto stage_output_data_frame = std::get<0>(descriptor.intermediate_stage_outputs.at(stage_node.node_id()));
+	const auto [output_uuid, output_row_count, output_partitions] = descriptor.stage_progress.at(stage_node.node_id()).stage_output;
 
 	herd::common::InputDataFramePtr input_data_frame_ptr = {
 			{
-					parent_data_frame,
-					key.partition,
+					parent_uuid,
+					key.part,
 			},
-			parent_row_count
+			parent_partition_row_count
 	};
 
 	herd::common::DataFramePtr output_data_frame_ptr = {
-			stage_output_data_frame,
-			key.partition
+			output_uuid,
+			key.part
 	};
 
 	herd::common::CryptoKeyPtr crypto_key_ptr = {
@@ -257,6 +262,100 @@ herd::common::task_t ExecutionService::build_map_task(const JobDescriptor& descr
 		output_data_frame_ptr,
 		crypto_key_ptr,
 		stage.circuit
+	};
+}
+
+herd::common::task_t ExecutionService::build_reduce_task(const ExecutionService::JobDescriptor& descriptor, const TaskKey& key) const
+{
+	const auto& stage_node = descriptor.plan.execution_graph[key.stage_node_id];
+	const auto& stage = std::get<herd::common::ReduceStage>(stage_node.value());
+
+	const auto& stage_progress = descriptor.stage_progress.at(key.stage_node_id);
+
+	const auto parent_stage_nodes = stage_node.parents();
+	assert(parent_stage_nodes.size() == 1);
+	const auto& [parent_uuid, parent_row_count, parent_partitions] = descriptor.stage_progress.at(parent_stage_nodes[0].node_id()).stage_output;
+
+	std::vector<herd::common::InputDataFramePtr> input_ptrs;
+	herd::common::DataFramePtr output_ptr{};
+
+	if(stage.policy == herd::common::Policy::PARALLEL)
+	{
+		const auto& state = stage_progress.state;
+		assert(std::holds_alternative<ReduceStageState>(state));
+
+		const auto& reduce_state = std::get<ReduceStageState>(state);
+		const auto& [hidden_uuid, hidden_size, hidden_partitions] = reduce_state.hidden_stage_output.value();
+
+		if(key.part == parent_partitions)
+		{
+			for(unsigned int i = 0; i < hidden_partitions; ++i)
+			{
+				herd::common::InputDataFramePtr data_frame_ptr {
+					{
+							hidden_uuid,
+							i
+					},
+					1
+				};
+				input_ptrs.emplace_back(data_frame_ptr);
+			}
+
+			output_ptr = herd::common::DataFramePtr{
+					std::get<0>(stage_progress.stage_output),
+					0
+			};
+		}
+		else
+		{
+			const auto parent_partition_row_count = storage_service_.get_partition_size(key.session_uuid, parent_uuid, key.part);
+
+			herd::common::InputDataFramePtr data_frame_ptr {
+					{
+							parent_uuid,
+							key.part
+					},
+					parent_partition_row_count
+			};
+			input_ptrs.emplace_back(data_frame_ptr);
+
+			output_ptr = herd::common::DataFramePtr{
+					hidden_uuid,
+					key.part
+			};
+		}
+	}
+	else if(stage.policy == herd::common::Policy::SEQUENCED)
+	{
+		for(unsigned int i = 0; i < parent_partitions; ++i)
+		{
+			const auto parent_partition_row_count = storage_service_.get_partition_size(key.session_uuid, parent_uuid, key.part);
+			herd::common::InputDataFramePtr data_frame_ptr {
+					{
+							parent_uuid,
+							i
+					},
+					parent_partition_row_count
+			};
+			input_ptrs.emplace_back(data_frame_ptr);
+		}
+
+		output_ptr = herd::common::DataFramePtr{
+				std::get<0>(stage_progress.stage_output),
+				0
+		};
+	}
+
+	herd::common::CryptoKeyPtr crypto_key_ptr = {
+			descriptor.plan.schema_type
+	};
+
+	return herd::common::ReduceTask {
+			key.session_uuid,
+			input_ptrs,
+			output_ptr,
+			crypto_key_ptr,
+			stage.circuit
 	};
 }
 
@@ -273,7 +372,7 @@ void ExecutionService::mark_task_completed(const TaskKey& key)
 	std::unique_lock lock(jobs_mutex_);
 
 	auto& job = get_job_descriptor(key.session_uuid, key.job_uuid);
-	auto& task = get_task(job, key.stage_node_id, key.partition);
+	auto& task = get_task(job, key.stage_node_id, key.part);
 
 	task.state = StageTask::State::COMPLETED;
 
@@ -324,101 +423,213 @@ void ExecutionService::initialize_job(const herd::common::UUID& session_uuid, Ex
 
 		if(std::holds_alternative<herd::common::InputStage>(node.value()))
 		{
-			const auto& input_stage = std::get<herd::common::InputStage>(node.value());
-			const auto data_frame = storage_service_.get_data_frame(session_uuid, input_stage.data_frame_uuid);
-
-
-			descriptor.intermediate_stage_outputs.try_emplace(node.node_id(), input_stage.data_frame_uuid, data_frame->row_count, data_frame->partitions);
+			initialize_input_stage(node, descriptor, session_uuid);
+		}
+		else if(std::holds_alternative<herd::common::OutputStage>(node.value()))
+		{
+			initialize_output_stage(node, descriptor);
 		}
 		else
 		{
 			if(std::holds_alternative<herd::common::MapperStage>(node.value()))
 			{
-				const auto& mapper_stage = std::get<herd::common::MapperStage>(node.value());
-				const auto parent_stages = node.parents();
-				assert(parent_stages.size() == 1);
-
-				const auto input_data_frame_entry = descriptor.intermediate_stage_outputs.at(parent_stages[0].node_id());
-				const auto& [input_data_frame, row_count, partitions] = input_data_frame_entry;
-				const auto name = "intermediate-" + descriptor.uuid.as_string() + "-" + std::to_string(node.node_id());
-
-				std::vector<herd::common::ColumnMeta> columns;
-				columns.reserve(mapper_stage.circuit.output.size());
-				for(std::size_t i = 0; i < mapper_stage.circuit.output.size(); ++i)
-				{
-					const auto& output_column = mapper_stage.circuit.output[i];
-					columns.emplace_back(output_column.name, output_column.data_type);
-				}
-
-				const auto intermediate_data_frame = storage_service_.create_data_frame(
-						session_uuid, name,
-						descriptor.plan.schema_type, columns,
-						row_count,
-						partitions);
-
-				descriptor.intermediate_stage_outputs.try_emplace(node.node_id(), intermediate_data_frame, row_count, partitions);
-
-				if(!descriptor.dependency_lookup.contains(node.node_id()))
-				{
-					descriptor.dependency_lookup.try_emplace(node.node_id(), 0);
-				}
-
-				for(const auto parent: node.parents())
-				{
-					if(!std::holds_alternative<herd::common::InputStage>(parent.value()))
-					{
-						++descriptor.dependency_lookup.at(node.node_id());
-					}
-				}
+				initialize_map_stage(node, descriptor, session_uuid);
 			}
-			else if(std::holds_alternative<herd::common::OutputStage>(node.value()))
+			else if(std::holds_alternative<herd::common::ReduceStage>(node.value()))
 			{
-				//			const auto& output_stage = std::get<herd::common::OutputStage>(node.value());
-				//todo: rename data frame
-				const auto parent_stages = node.parents();
-				assert(parent_stages.size() == 1);
+				initialize_reduce_stage(node, descriptor, session_uuid);
+			}
 
-				const auto input_data_frame_entry = descriptor.intermediate_stage_outputs.at(parent_stages[0].node_id());
-				const auto& [input_data_frame, row_count, partitions] = input_data_frame_entry;
-				descriptor.intermediate_stage_outputs.try_emplace(node.node_id(), input_data_frame, row_count, partitions);
+			if(!descriptor.dependency_lookup.contains(node.node_id()))
+			{
+				descriptor.dependency_lookup.try_emplace(node.node_id(), 0);
+			}
+
+			for(const auto parent: node.parents())
+			{
+				if(!std::holds_alternative<herd::common::InputStage>(parent.value()))
+				{
+					++descriptor.dependency_lookup.at(node.node_id());
+				}
 			}
 		}
 	}
+}
+
+void ExecutionService::initialize_input_stage(
+		const herd::common::DAG<herd::common::stage_t>::Node<true>& stage_node,
+		ExecutionService::JobDescriptor& descriptor, const herd::common::UUID& session_uuid
+)
+{
+	const auto& input_stage = std::get<herd::common::InputStage>(stage_node.value());
+	const auto data_frame = storage_service_.get_data_frame(session_uuid, input_stage.data_frame_uuid);
+
+	StageProgress progress(
+			stage_node,
+			std::make_tuple(input_stage.data_frame_uuid, data_frame->row_count, data_frame->partitions),
+			std::monostate()
+	);
+	descriptor.stage_progress.try_emplace(stage_node.node_id(), progress);
+}
+
+void ExecutionService::initialize_output_stage(
+		const herd::common::DAG<herd::common::stage_t>::Node<true>& stage_node,
+		ExecutionService::JobDescriptor& descriptor
+)
+{
+	//todo: rename data frame
+	const auto parent_stages = stage_node.parents();
+	assert(parent_stages.size() == 1);
+
+	auto input_data_frame_entry = descriptor.stage_progress.at(parent_stages[0].node_id()).stage_output;
+
+	StageProgress progress(
+			stage_node,
+			input_data_frame_entry,
+			std::monostate()
+	);
+
+	descriptor.stage_progress.try_emplace(stage_node.node_id(), progress);
+}
+
+void ExecutionService::initialize_map_stage(
+		const herd::common::DAG<herd::common::stage_t>::Node<true>& stage_node,
+		ExecutionService::JobDescriptor& descriptor, const herd::common::UUID& session_uuid
+)
+{
+	const auto& mapper_stage = std::get<herd::common::MapperStage>(stage_node.value());
+	const auto parent_stages = stage_node.parents();
+	assert(parent_stages.size() == 1);
+
+	const auto& [input_data_frame, row_count, partitions] = descriptor.stage_progress.at(parent_stages[0].node_id()).stage_output;
+	const auto name = "intermediate-" + descriptor.uuid.as_string() + "-" + std::to_string(stage_node.node_id());
+
+	std::vector<herd::common::ColumnMeta> columns;
+	columns.reserve(mapper_stage.circuit.output.size());
+	for(const auto & output_column : mapper_stage.circuit.output)
+	{
+			columns.emplace_back(output_column.name, output_column.data_type);
+	}
+
+	const auto intermediate_data_frame = storage_service_.create_data_frame(
+			session_uuid, name,
+			descriptor.plan.schema_type, columns,
+			row_count,
+			partitions);
+
+	StageProgress progress(
+			stage_node,
+			std::make_tuple(intermediate_data_frame, row_count, partitions),
+			std::monostate()
+	);
+
+	descriptor.stage_progress.try_emplace(stage_node.node_id(), progress);
+}
+
+void ExecutionService::initialize_reduce_stage(const herd::common::DAG<herd::common::stage_t>::Node<true>& stage_node, ExecutionService::JobDescriptor& descriptor, const herd::common::UUID& session_uuid)
+{
+	const auto& reduce_stage = std::get<herd::common::ReduceStage>(stage_node.value());
+	const auto parent_stages = stage_node.parents();
+	assert(parent_stages.size() == 1);
+
+	const auto& [input_data_frame, row_count, partitions] = descriptor.stage_progress.at(parent_stages[0].node_id()).stage_output;
+	const auto name = "intermediate-reduce" + descriptor.uuid.as_string() + "-" + std::to_string(stage_node.node_id());
+
+	std::vector<herd::common::ColumnMeta> columns;
+	columns.reserve(reduce_stage.circuit.output.size());
+	for(const auto & output_column : reduce_stage.circuit.output)
+	{
+			columns.emplace_back(output_column.name, output_column.data_type);
+	}
+
+	const auto intermediate_data_frame = storage_service_.create_data_frame(
+			session_uuid, name,
+			descriptor.plan.schema_type, columns,
+			1,
+			1
+	);
+
+	StageProgress progress(
+			stage_node,
+			std::make_tuple(intermediate_data_frame, 1, 1),
+			ReduceStageState{
+					std::nullopt
+			}
+	);
+
+	if(reduce_stage.policy == herd::common::Policy::PARALLEL)
+	{
+			const auto intermediate_hidden_frame = storage_service_.create_data_frame(
+					session_uuid, "hidden-" + name,
+					descriptor.plan.schema_type,
+					columns,
+					partitions,
+					partitions
+			);
+
+			progress.state = ReduceStageState{
+					std::make_tuple(intermediate_hidden_frame, partitions, partitions)
+			};
+	}
+
+	descriptor.stage_progress.try_emplace(stage_node.node_id(), progress);
 }
 
 void ExecutionService::recalculate_waiting_tasks(ExecutionService::JobDescriptor& descriptor)
 {
 	//complete ended stages
 	std::vector<std::size_t> completed_stages;
-	for(auto stage: descriptor.pending_stages)
+	for(auto stage_id: descriptor.pending_stage_ids)
 	{
+		auto& stage = descriptor.stage_progress.at(stage_id);
 		const auto stage_completed = std::ranges::all_of(
 				stage.pending_tasks,
 				[](const StageTask& task)
 				{
-					return task.state == StageTask::State::COMPLETED;
+					return task.state == StageTask::State::COMPLETED || task.state == StageTask::State::BLOCKED;
 				}
 		);
 
 		if(stage_completed)
 		{
-			completed_stages.emplace_back(stage.stage_node.node_id());
-
-			for(const auto& child: stage.stage_node.children())
-			{
-				if(descriptor.dependency_lookup.contains(child.node_id()))
+			const auto blocked_tasks_present = std::ranges::any_of(
+				stage.pending_tasks,
+				[](const StageTask& task)
 				{
-					--descriptor.dependency_lookup.at(child.node_id());
+					return task.state == StageTask::State::BLOCKED;
+				}
+			);
+
+			if(blocked_tasks_present)
+			{
+				for(auto& task: stage.pending_tasks)
+				{
+					if(task.state == StageTask::State::BLOCKED)
+					{
+						task.state = StageTask::State::WAITING;
+					}
+				}
+			}
+			else
+			{
+				completed_stages.emplace_back(stage.stage_node.node_id());
+
+				for(const auto& child: stage.stage_node.children())
+				{
+					if(descriptor.dependency_lookup.contains(child.node_id()))
+					{
+						--descriptor.dependency_lookup.at(child.node_id());
+					}
 				}
 			}
 		}
 	}
 
 	std::erase_if(
-			descriptor.pending_stages,
-			[completed_stages](const StageProgress& progress)
+			descriptor.pending_stage_ids,
+			[completed_stages](std::size_t stage_id)
 			{
-				return std::ranges::find(completed_stages, progress.stage_node.node_id()) != std::end(completed_stages);
+				return std::ranges::find(completed_stages, stage_id) != std::end(completed_stages);
 			}
  	);
 
@@ -435,26 +646,45 @@ void ExecutionService::recalculate_waiting_tasks(ExecutionService::JobDescriptor
 	std::ranges::for_each(starting_stages, [&descriptor](const std::size_t index){ descriptor.dependency_lookup.erase(index); });
 	for(const auto stage_node_id: starting_stages)
 	{
-		StageProgress progress{};
 		const auto stage_node = descriptor.plan.execution_graph[stage_node_id];
-		progress.stage_node = static_cast<decltype(descriptor.plan.execution_graph)::Node<true>>(stage_node);
+		auto& progress = descriptor.stage_progress.at(stage_node_id);
 
 		if(std::holds_alternative<herd::common::MapperStage>(stage_node.value()))
 		{
 			const auto parent_stages = stage_node.parents();
 			assert(parent_stages.size() == 1);
 
-			const auto partitions = std::get<2>(descriptor.intermediate_stage_outputs[parent_stages[0].node_id()]);
+			const auto [parent_uuid, row_count, partitions] = descriptor.stage_progress.at(parent_stages[0].node_id()).stage_output;
 			for(std::uint32_t i = 0; i < partitions; ++i)
 			{
 				progress.pending_tasks.emplace_back(i);
 			}
 		}
+		else if(std::holds_alternative<herd::common::ReduceStage>(stage_node.value()))
+		{
+			const auto& reduce_stage = std::get<herd::common::ReduceStage>(stage_node.value());
+			const auto parent_stages = stage_node.parents();
+			assert(parent_stages.size() == 1);
 
-		descriptor.pending_stages.emplace_back(progress);
+			const auto [parent_uuid, row_count, partitions] = descriptor.stage_progress.at(parent_stages[0].node_id()).stage_output;
+			if(reduce_stage.policy == herd::common::Policy::PARALLEL)
+			{
+				for(std::uint32_t i = 0; i < partitions; ++i)
+				{
+					progress.pending_tasks.emplace_back(i);
+				}
+				progress.pending_tasks.emplace_back(partitions, StageTask::State::BLOCKED);
+			}
+			else if(reduce_stage.policy == herd::common::Policy::SEQUENCED)
+			{
+				progress.pending_tasks.emplace_back(0);
+			}
+		}
+
+		descriptor.pending_stage_ids.emplace_back(stage_node_id);
 	}
 
-	if(descriptor.pending_stages.empty())
+	if(descriptor.pending_stage_ids.empty())
 	{
 		descriptor.status = herd::common::JobStatus::COMPLETED;
 	}
@@ -465,7 +695,7 @@ void ExecutionService::mark_task_failed(const TaskKey& key)
 	std::unique_lock lock(jobs_mutex_);
 
 	auto& job = get_job_descriptor(key.session_uuid, key.job_uuid);
-	auto& task = get_task(job, key.stage_node_id, key.partition);
+	auto& task = get_task(job, key.stage_node_id, key.part);
 
 	task.state = StageTask::State::FAILED;
 	job.status = herd::common::JobStatus::FAILED;
@@ -473,22 +703,15 @@ void ExecutionService::mark_task_failed(const TaskKey& key)
 
 ExecutionService::StageTask& ExecutionService::get_task(ExecutionService::JobDescriptor& descriptor, std::size_t stage_node_id, uint32_t partition)
 {
-	auto stage_iter = std::ranges::find_if(
-			descriptor.pending_stages,
-			[stage_node_id](const StageProgress& progress)
-			{
-				return progress.stage_node.node_id() == stage_node_id;
-			}
-	);
-	assert(stage_iter != std::end(descriptor.pending_stages));
+	auto& stage_progress = descriptor.stage_progress.at(stage_node_id);
 	auto task_iter = std::ranges::find_if(
-			stage_iter->pending_tasks,
+			stage_progress.pending_tasks,
 			[partition](const StageTask& task)
 			{
 				return task.partition == partition;
 			}
 	);
-	assert(task_iter != std::end(stage_iter->pending_tasks));
+	assert(task_iter != std::end(stage_progress.pending_tasks));
 
 	return *task_iter;
 }

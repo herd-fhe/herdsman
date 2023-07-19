@@ -54,6 +54,7 @@ public:
 	[[nodiscard]] std::vector<DataFrameEntry> list_session_data_frames(const herd::common::UUID& session_uuid, herd::common::SchemaType type);
 
 	[[nodiscard]] uint64_t get_partition_size(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid, uint32_t partition) const;
+	[[nodiscard]] uint32_t get_partition_count(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid) const;
 
 private:
 	struct UploadState

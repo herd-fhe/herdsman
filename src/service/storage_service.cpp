@@ -332,6 +332,14 @@ uint64_t StorageService::get_partition_size(const herd::common::UUID& session_uu
 	return chunk_row_count + (partition < remainder_count ? 1 : 0);
 }
 
+uint32_t StorageService::get_partition_count(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid) const
+{
+	const auto data_frame_opt = get_data_frame(session_uuid, uuid);
+	assert(data_frame_opt.has_value());
+
+	return data_frame_opt.value().partitions;
+}
+
 std::optional<StorageService::DataFrameEntry> StorageService::get_data_frame(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid) const
 {
 	std::shared_lock lock(descriptors_mutex_);

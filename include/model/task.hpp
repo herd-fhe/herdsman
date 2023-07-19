@@ -8,7 +8,7 @@ struct TaskKey
 	herd::common::UUID session_uuid;
 	herd::common::UUID job_uuid;
 	std::size_t stage_node_id;
-	uint32_t partition;
+	uint32_t part;
 
 	std::strong_ordering operator<=>(const TaskKey& other) const
 	{
@@ -23,7 +23,7 @@ struct TaskKey
 		}
 		if(cmp == std::strong_ordering::equal)
 		{
-			cmp = partition <=> other.partition;
+			cmp = part <=> other.part;
 		}
 
 		return cmp;
