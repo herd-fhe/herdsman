@@ -11,8 +11,12 @@ gcc13Stdenv.mkDerivation rec {
     version = "0.0.2";
     src = ./.;
 
-    buildInputs = [
+    nativeBuildInputs = [
         pkgconfig
+        cmake
+    ];
+
+    buildInputs = [
         libuuid
         sqlite
         openssl
@@ -20,6 +24,5 @@ gcc13Stdenv.mkDerivation rec {
         libsodium
         protobuf
         grpc
-        cmake
     ];
 }
