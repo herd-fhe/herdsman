@@ -171,6 +171,9 @@ target_sources(
         include/plugins/token_auth_metadata_processor.hpp
 )
 
+#  Fix for gcc bug https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105580
+set_source_files_properties(src/utils/file_utils.cpp PROPERTIES COMPILE_FLAGS -Wno-null-dereference)
+
 target_compile_definitions(
         herdsman
         PUBLIC
