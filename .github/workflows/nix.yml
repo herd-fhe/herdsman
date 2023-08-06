@@ -1,0 +1,25 @@
+name: "Test nix build"
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  test-nix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 2
+
+      - name: Install nix
+        uses: cachix/install-nix-action@v22
+        with:
+          nix_path: nixpkgs=channel:nixos-23.05
+
+      - name: Build
+        run: nix-build
