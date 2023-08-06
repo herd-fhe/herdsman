@@ -228,6 +228,9 @@ target_include_directories(herdsman SYSTEM PRIVATE ${YAML_INCLUDE})
 
 add_dependencies(herdsman herdsman-config)
 
+# Install
+install(TARGETS herdsman DESTINATION bin)
+
 # Test
 
 option(ENABLE_TESTS "Enable tests" FALSE)
