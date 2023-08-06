@@ -26,7 +26,9 @@ std::string read_file(const std::filesystem::path &filepath)
 
 	try
 	{
-		string_data.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+		const auto start_iter = std::istreambuf_iterator<char>(file);
+		const auto end_iter = std::istreambuf_iterator<char>();
+		string_data.assign(start_iter, end_iter);
 	}
 	catch(const std::ios_base::failure&)
 	{
