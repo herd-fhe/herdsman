@@ -98,6 +98,8 @@ LambdaWorkerGroup::LambdaWorkerGroup(const Address& lambda_address, std::size_t 
 		throw std::runtime_error("Curl initialization failed");
 	}
 
+	spdlog::debug("Lambda worker - concurrency limit: {}", concurrency_limit);
+
 	multi_handle_ = curl_multi_init();
 	curl_multi_setopt(multi_handle_, CURLMOPT_MAX_TOTAL_CONNECTIONS, concurrency_limit);
 
@@ -193,8 +195,6 @@ std::shared_ptr<IWorkerGroup::TaskHandle> LambdaWorkerGroup::schedule_task(const
 		std::unique_lock lock(queue_mutex_);
 		handle_queue_.push(task_handle);
 	}
-
-	curl_multi_wakeup(multi_handle_);
 
 	return task_handle;
 }
