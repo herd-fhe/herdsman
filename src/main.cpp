@@ -21,7 +21,9 @@
 #include "controller/execution_controller.hpp"
 #include "controller/session_controller.hpp"
 #include "controller/storage_controller.hpp"
+
 #include "execution/worker/grpc_worker_group.hpp"
+#include "execution/worker/lambda_http_worker_group.hpp"
 
 
 std::shared_ptr<grpc::ServerCredentials> build_server_credentials(
@@ -68,6 +70,11 @@ std::unique_ptr<IWorkerGroup> build_worker_group(const Config::workers_config_t&
 	{
 		const auto& grpc_workers_config = std::get<Config::GrpcWorkersConfig>(workers_config);
 		return std::make_unique<GrpcWorkerGroup>(grpc_workers_config.addresses);
+	}
+	else if(std::holds_alternative<Config::LambdaWorkersConfig>(workers_config))
+	{
+		const auto& lambda_worker_config = std::get<Config::LambdaWorkersConfig>(workers_config);
+		return std::make_unique<LambdaWorkerGroup>(lambda_worker_config.address , lambda_worker_config.concurrency_limit);
 	}
 
 	assert(false && "Invalid configuration");

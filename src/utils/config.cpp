@@ -107,6 +107,19 @@ namespace
 		return logging_config;
 	}
 
+	Config::LambdaWorkersConfig load_lambda_workers_config(const YAML::Node& node)
+	{
+		Config::LambdaWorkersConfig config{};
+
+		const auto& address_node = node["address"];
+		config.address.hostname = get_value<std::string>(address_node, "hostname");
+		config.address.port = get_value<uint16_t>(address_node, "port");
+
+		config.concurrency_limit = get_optional_value<std::size_t>(node, "concurrency_limit", 1);
+
+		return config;
+	}
+
 	Config::GrpcWorkersConfig load_grpc_workers_config(const YAML::Node& node)
 	{
 		Config::GrpcWorkersConfig config{};
@@ -132,13 +145,27 @@ namespace
 	Config::workers_config_t load_workers_config(const YAML::Node& node)
 	{
 		Config::workers_config_t workers_config;
-		if (const auto grpc_node = node["grpc"]; grpc_node)
+		if(node.size() == 0)
+		{
+			throw std::runtime_error("No workers configuration");
+		}
+
+		if(node.size() > 1)
+		{
+			throw std::runtime_error("Multiple workers configuration not supported");
+		}
+
+		if(const auto grpc_node = node["grpc"]; grpc_node)
 		{
 			workers_config = load_grpc_workers_config(grpc_node);
 		}
+		else if(const auto lambda_node = node["lambda"]; lambda_node)
+		{
+			workers_config = load_lambda_workers_config(lambda_node);
+		}
 		else
 		{
-			throw std::runtime_error("No workers configuration");
+			throw std::runtime_error("Invalid worker type");
 		}
 
 		return workers_config;

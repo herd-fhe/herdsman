@@ -26,7 +26,7 @@ GrpcWorkerGroup::GrpcWorkerGroup(const std::vector<Address>& worker_addresses)
 
 	thread_ = std::jthread([group = this]()
 	{
-			thread_body(*group);
+		thread_body(*group);
 	});
 }
 
@@ -56,6 +56,8 @@ void GrpcWorkerGroup::thread_body(GrpcWorkerGroup& worker_group)
 			const auto& status = worker_group.statuses_[tag];
 
 			status->mark_completed();
+
+			worker_group.statuses_.erase(tag);
 		}
 	}
 }

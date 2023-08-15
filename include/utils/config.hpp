@@ -52,7 +52,12 @@ struct Config
 		std::vector<Address> addresses;
 	};
 
-	using workers_config_t = std::variant<GrpcWorkersConfig>;
+	struct LambdaWorkersConfig {
+		Address address;
+		std::size_t concurrency_limit;
+	};
+
+	using workers_config_t = std::variant<GrpcWorkersConfig, LambdaWorkersConfig>;
 
 	ServerConfig server;
 	SecurityConfig security;
