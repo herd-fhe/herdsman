@@ -101,8 +101,12 @@ void init_global_logger(const Config::LoggingConfig& config)
 int main()
 {
 	const auto config = load_config("./herdsman.yaml");
-
 	init_global_logger(config.logging);
+
+	if(spdlog::should_log(spdlog::level::debug))
+	{
+		log_config(config);
+	}
 
 	const paseto_key_type paseto_key = init_paseto(config.security.secret_key);
 	const std::string address = config.server.listen_address.hostname + ":" + std::to_string(config.server.listen_address.port);
