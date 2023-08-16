@@ -175,8 +175,7 @@ std::shared_ptr<IWorkerGroup::TaskHandle> LambdaWorkerGroup::schedule_task(const
 	struct curl_slist* headers = nullptr;
 	headers = curl_slist_append(headers, "Content-Type: application/json");
 
-//	const auto url = lambda_address_.hostname + ":" + std::to_string(lambda_address_.port);
-	const auto url = lambda_address_.hostname;
+	const auto url = lambda_address_.hostname + ":" + std::to_string(lambda_address_.port);
 	curl_easy_setopt(handle, CURLOPT_URL, url.c_str());
 
 	curl_easy_setopt(handle, CURLOPT_HTTPHEADER, headers);
