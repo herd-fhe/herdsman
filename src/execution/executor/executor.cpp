@@ -101,6 +101,9 @@ namespace executor
 			if(task_entry.has_value())
 			{
 				schedule_task_on_worker(task_entry.value());
+			}
+			else
+			{
 				break;
 			}
 		}

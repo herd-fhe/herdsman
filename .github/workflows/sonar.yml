@@ -53,6 +53,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt install build-essential autoconf libtool pkg-config libomp-dev libsodium-dev libprotobuf-dev ninja-build
+          sudo apt install libcurl4 libssl-dev libcurl4-openssl-dev
         shell: bash
 
       - uses: ./proto/action/install-grpc

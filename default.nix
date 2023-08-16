@@ -24,5 +24,6 @@ gcc13Stdenv.mkDerivation rec {
         libsodium
         protobuf
         grpc
+        curl
     ];
 }

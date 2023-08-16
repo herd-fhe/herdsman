@@ -66,6 +66,9 @@ endif()
 # Dependencies
 find_package(PkgConfig REQUIRED)
 
+find_package(CURL REQUIRED)
+add_subdirectory(third-party/json)
+
 ## OpenFHE
 find_package(OpenFHE REQUIRED)
 
@@ -134,6 +137,7 @@ target_sources(
 
         src/execution/worker/i_worker_group.cpp
         src/execution/worker/grpc_worker_group.cpp
+        src/execution/worker/lambda_http_worker_group.cpp
 
         src/plugins/token_auth_metadata_processor.cpp
 
@@ -165,6 +169,7 @@ target_sources(
 
         include/execution/worker/i_worker_group.hpp
         include/execution/worker/grpc_worker_group.hpp
+        include/execution/worker/lambda_http_worker_group.hpp
 
         include/service/common_exceptions.hpp
 
@@ -199,8 +204,10 @@ target_link_libraries(
         ${SODIUM_LIBRARIES}
         paseto
         SQLite::SQLite3
+        CURL::libcurl
 
         yaml-cpp::yaml-cpp
+        nlohmann_json::nlohmann_json
 
         spdlog::spdlog_header_only
 

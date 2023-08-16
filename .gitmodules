@@ -16,3 +16,6 @@
 [submodule "mappers"]
 	path = mappers
 	url = https://github.com/herd-fhe/dto_mappers.git
+[submodule "third-party/json"]
+	path = third-party/json
+	url = https://github.com/nlohmann/json.git
