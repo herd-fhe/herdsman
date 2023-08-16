@@ -54,7 +54,7 @@ struct Config
 
 	struct LambdaWorkersConfig {
 		Address address;
-		std::size_t concurrency_limit;
+		std::size_t concurrency_limit = 1;
 	};
 
 	using workers_config_t = std::variant<GrpcWorkersConfig, LambdaWorkersConfig>;
@@ -67,5 +67,7 @@ struct Config
 
 
 Config load_config(const std::filesystem::path& path);
+
+void log_config(const Config& config);
 
 #endif //HERDSMAN_CONFIG_HPP

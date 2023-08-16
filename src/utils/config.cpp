@@ -170,6 +170,68 @@ namespace
 
 		return workers_config;
 	}
+
+	Config::LambdaWorkersConfig load_lambda_workers_config_override()
+	{
+		Config::LambdaWorkersConfig config{};
+
+		bool hostname_loaded = false;
+		bool port_loaded = false;
+
+		if(const auto hostname = std::getenv("LAMBDA_WORKER_HOSTNAME"))
+		{
+			config.address.hostname = hostname;
+			hostname_loaded = true;
+		}
+
+		if(const auto port = std::getenv("LAMBDA_WORKER_PORT"))
+		{
+			config.address.port = static_cast<uint16_t>(std::atoi(port));
+			port_loaded = true;
+		}
+
+		if(!hostname_loaded || !port_loaded)
+		{
+			throw std::runtime_error("Incomplete Lamda worker configuration");
+		}
+
+		if(const auto concurrency_limit = std::getenv("LAMBDA_CONCURRENCY_LIMIT"))
+		{
+			config.concurrency_limit = static_cast<size_t>(std::atoi(concurrency_limit));
+		}
+
+		return config;
+	}
+
+	std::optional<Config::workers_config_t> load_workers_config_override()
+	{
+		if(const auto worker_type = std::getenv("WORKER_TYPE"))
+		{
+			if(strcmp(worker_type, "LAMBDA") == 0)
+			{
+				return load_lambda_workers_config_override();
+			}
+		}
+		return std::nullopt;
+	}
+
+	std::string log_level_to_str(Config::LoggingConfig::LogLevel level)
+	{
+		switch(level)
+		{
+			using enum Config::LoggingConfig::LogLevel;
+			case INFO:
+				return "INFO";
+			case WARNING:
+				return "WARNING";
+			case ERROR:
+				return "ERROR";
+			case DEBUG:
+				return "DEBUG";
+		}
+
+		return "UNKNOWN";
+	}
 }
 
 Config load_config(const std::filesystem::path &path)
@@ -222,6 +284,11 @@ Config load_config(const std::filesystem::path &path)
 	if(const auto node = root_node["workers"]; node)
 	{
 		config.workers = load_workers_config(node);
+		const auto override = load_workers_config_override();
+		if(override.has_value())
+		{
+			config.workers = override.value();
+		}
 	}
 	else
 	{
@@ -230,4 +297,62 @@ Config load_config(const std::filesystem::path &path)
 	}
 
 	return config;
+}
+
+void log_config(const Config& config)
+{
+	const auto listen_address = config.server.listen_address.hostname + ":" + std::to_string(config.server.listen_address.port);
+
+	std::stringstream config_description;
+	config_description << "===== CONFIG =====\n";
+	config_description << "\n";
+	config_description << "[server_config]\n";
+
+	config_description << "listen_address = \"" << listen_address << "\"\n";
+	config_description << "key_directory = \"" << config.server.key_directory << "\"\n";
+	config_description << "storage_directory = \"" << config.server.storage_directory << "\"\n";
+	config_description << "\n";
+	config_description << "[security_config]\n";
+	config_description << "token_lifetime = " << config.security.token_lifetime << "\n";
+
+	if(config.security.ssl_config.has_value())
+	{
+		const auto& ssl_config = config.security.ssl_config.value();
+		config_description << "ca_certificate_path = \"" << ssl_config.ca_certificate_path << "\"\n";
+		config_description << "certificate_path = \"" << ssl_config.certificate_path << "\"\n";
+		config_description << "certificate_key_path = \"" << ssl_config.certificate_key_path << "\"\n";
+	}
+
+	config_description << "[logging]\n";
+	config_description << "level = " << log_level_to_str(config.logging.level) << "\n";
+
+	if(std::holds_alternative<Config::LambdaWorkersConfig>(config.workers))
+	{
+		const auto& lambda_config = std::get<Config::LambdaWorkersConfig>(config.workers);
+		const auto lambda_address = lambda_config.address.hostname + ":" + std::to_string(lambda_config.address.port);
+
+		config_description << "[workers - lambda]\n";
+		config_description << "address = \"" << lambda_address << "\"\n";
+		config_description << "concurrency_limit = " << lambda_config.concurrency_limit << "\n";
+
+	}
+	else if(std::holds_alternative<Config::GrpcWorkersConfig>(config.workers))
+	{
+		const auto& grpc_config = std::get<Config::GrpcWorkersConfig>(config.workers);
+
+		config_description << "[workers - grpc]\n";
+		config_description << "address = [";
+		for(std::size_t i = 0; i < grpc_config.addresses.size(); ++i)
+		{
+			config_description << "\t\"" <<grpc_config.addresses[i].hostname << ":" << grpc_config.addresses[i].port << "\"";
+			if(i != grpc_config.addresses.size() - 1)
+			{
+				config_description << ",";
+			}
+			config_description << "\n";
+		}
+		config_description << "]";
+	}
+
+	spdlog::debug(config_description.str());
 }
