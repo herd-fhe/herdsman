@@ -79,7 +79,11 @@ find_package(SQLite3)
 pkg_check_modules(SODIUM REQUIRED libsodium)
 
 ## Paseto
-add_subdirectory(third-party/libpaseto EXCLUDE_FROM_ALL)
+pkg_check_modules(PASETO QUIET paseto)
+if(NOT PASETO_MODULE_NAME)
+    message("Paseto not found. Using included")
+    add_subdirectory(third-party/libpaseto EXCLUDE_FROM_ALL)
+endif ()
 
 ## YAML
 add_subdirectory(third-party/yaml-cpp EXCLUDE_FROM_ALL)
@@ -202,7 +206,6 @@ target_link_libraries(
         OpenMP::OpenMP_CXX
 
         ${SODIUM_LIBRARIES}
-        paseto
         SQLite::SQLite3
         CURL::libcurl
 
@@ -226,8 +229,16 @@ target_include_directories(
         ${OpenFHE_INCLUDE}/binfhe
         ${SODIUM_INCLUDE_DIRS}
         ${UUID_INCLUDE_DIRS}
-        third-party/libpaseto/include
 )
+
+if(PASETO_MODULE_NAME)
+    target_include_directories(herdsman SYSTEM PRIVATE ${PASETO_INCLUDE_DIRS})
+    target_link_directories(herdsman PRIVATE ${PASETO_LIBRARY_DIRS})
+    target_link_libraries(herdsman PRIVATE ${PASETO_LIBRARIES})
+else()
+    target_include_directories(herdsman SYSTEM PRIVATE third-party/libpaseto/include)
+    target_link_libraries(herdsman PRIVATE paseto)
+endif()
 
 # Hack for yaml-cpp
 get_target_property(YAML_INCLUDE yaml-cpp::yaml-cpp INTERFACE_INCLUDE_DIRECTORIES)

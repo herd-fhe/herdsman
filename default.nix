@@ -2,6 +2,7 @@
 
 let
     openfhe = import ./common/nix/openfhe { inherit pkgs; };
+    libpaseto = import ./common/nix/libpaseto { inherit pkgs; };
 in
 
 with pkgs;
@@ -12,8 +13,9 @@ gcc13Stdenv.mkDerivation rec {
     src = ./.;
 
     nativeBuildInputs = [
-        pkgconfig
+        pkg-config
         cmake
+        libpaseto
     ];
 
     buildInputs = [
