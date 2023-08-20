@@ -53,7 +53,7 @@ namespace
 	std::string build_reduce_payload(const herd::common::ReduceTask& reduce_task)
 	{
 		nlohmann::json payload;
-		payload["type"] = "REDCUE";
+		payload["type"] = "REDUCE";
 
 		{
 			const auto reduce_task_proto = herd::mapper::to_proto(reduce_task);
