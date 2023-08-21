@@ -73,10 +73,12 @@ public:
 		JobDescriptor(
 				const herd::common::UUID& job_uuid,
 				herd::common::JobStatus job_status,
-				herd::common::ExecutionPlan job_plan)
+				herd::common::ExecutionPlan job_plan,
+				std::size_t job_concurrency_limit)
 		: 	uuid(job_uuid),
 			status(job_status),
-			plan(std::move(job_plan))
+			plan(std::move(job_plan)),
+			concurrency_limit(job_concurrency_limit)
 		{}
 
 		herd::common::UUID uuid;
@@ -86,6 +88,9 @@ public:
 		herd::common::JobStatus status;
 
 		herd::common::ExecutionPlan plan;
+
+		std::size_t concurrency_limit;
+		std::size_t running_tasks = 0;
 	};
 
 	struct JobDescription
@@ -102,7 +107,7 @@ public:
 		std::optional<std::string> message;
 	};
 
-	ExecutionService::JobDescription schedule_job(const herd::common::UUID& session_uuid, const herd::common::ExecutionPlan& plan);
+	ExecutionService::JobDescription schedule_job(const herd::common::UUID& session_uuid, const herd::common::ExecutionPlan& plan, std::size_t concurrency_limit);
 
 	JobExecutionState get_job_state(const herd::common::UUID& session_uuid, const herd::common::UUID& job_uuid);
 	std::vector<JobExecutionState> get_job_states_for_session(const herd::common::UUID& session_uuid);
@@ -112,6 +117,7 @@ public:
 	void set_executor(std::shared_ptr<executor::IExecutor> executor) noexcept;
 
 	[[nodiscard]] std::optional<TaskKey> get_next_for_execution();
+	void mark_task_running(TaskKey key);
 	[[nodiscard]] herd::common::task_t task_for_task_key(const TaskKey& key) const;
 
 	void mark_task_completed(const TaskKey& key);
