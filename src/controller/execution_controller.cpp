@@ -115,8 +115,9 @@ grpc::Status ExecutionController::schedule_job(grpc::ServerContext* context, con
 		}
 
 		const auto execution_plan = herd::mapper::to_model(request->plan());
+		const auto concurrency_limit = request->concurrency_limit();
 
-		const auto description = execution_service_.schedule_job(session_uuid, execution_plan);
+		const auto description = execution_service_.schedule_job(session_uuid, execution_plan, concurrency_limit);
 
 		response->set_uuid(description.uuid.as_string());
 		response->set_estimated_complexity(description.estimated_complexity);

@@ -82,6 +82,7 @@ namespace executor
 	void Executor::schedule_task_on_worker(const TaskKey& key)
 	{
 		const auto task = execution_service_.task_for_task_key(key);
+		execution_service_.mark_task_running(key);
 		auto task_handle = worker_group_->schedule_task(task);
 
 		task_handle->set_completion_callback(

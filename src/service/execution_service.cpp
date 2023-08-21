@@ -11,7 +11,7 @@ ExecutionService::ExecutionService(KeyService& key_service, StorageService& stor
 {
 }
 
-ExecutionService::JobDescription ExecutionService::schedule_job(const herd::common::UUID& session_uuid, const herd::common::ExecutionPlan& plan)
+ExecutionService::JobDescription ExecutionService::schedule_job(const herd::common::UUID& session_uuid, const herd::common::ExecutionPlan& plan, std::size_t concurrency_limit)
 {
 	const herd::common::UUID job_uuid = {};
 
@@ -23,7 +23,8 @@ ExecutionService::JobDescription ExecutionService::schedule_job(const herd::comm
 		auto job_descriptor = std::make_shared<JobDescriptor>(
 			job_uuid,
 			herd::common::JobStatus::WAITING_FOR_EXECUTION,
-			plan
+			plan,
+			concurrency_limit
 		);
 
 		initialize_job(session_uuid, *job_descriptor);
@@ -156,6 +157,11 @@ std::optional<TaskKey> ExecutionService::get_next_for_execution()
 
 	const auto& [session_uuid, job] = pending_jobs_.front();
 
+	if(job->concurrency_limit != 0 && job->concurrency_limit <= job->running_tasks)
+	{
+		return std::nullopt;
+	}
+
 	for(const auto stage_progress_id: job->pending_stage_ids)
 	{
 		auto& stage_progress = job->stage_progress.at(stage_progress_id);
@@ -175,6 +181,15 @@ std::optional<TaskKey> ExecutionService::get_next_for_execution()
 	}
 
 	return std::nullopt;
+}
+
+void ExecutionService::mark_task_running(TaskKey key)
+{
+	auto& job = get_job_descriptor(key.session_uuid, key.job_uuid);
+	auto& task = get_task(job, key.stage_node_id, key.part);
+
+	++job.running_tasks;
+	task.state = StageTask::State::PENDING;
 }
 
 const ExecutionService::JobDescriptor& ExecutionService::get_job_descriptor(const herd::common::UUID& session_uuid, const herd::common::UUID& job_uuid) const
@@ -372,6 +387,8 @@ void ExecutionService::mark_task_completed(const TaskKey& key)
 	std::unique_lock lock(jobs_mutex_);
 
 	auto& job = get_job_descriptor(key.session_uuid, key.job_uuid);
+	--job.running_tasks;
+
 	auto& task = get_task(job, key.stage_node_id, key.part);
 
 	task.state = StageTask::State::COMPLETED;
@@ -699,6 +716,11 @@ void ExecutionService::mark_task_failed(const TaskKey& key)
 
 	task.state = StageTask::State::FAILED;
 	job.status = herd::common::JobStatus::FAILED;
+
+	if(pending_jobs_.front().first == key.job_uuid)
+	{
+		pending_jobs_.pop();
+	}
 }
 
 ExecutionService::StageTask& ExecutionService::get_task(ExecutionService::JobDescriptor& descriptor, std::size_t stage_node_id, uint32_t partition)
