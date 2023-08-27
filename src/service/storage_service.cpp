@@ -121,7 +121,6 @@ uint64_t StorageService::append_to_data_frame(const herd::common::UUID& session_
 	const uint64_t chunk_row_count = data_frame_entry.row_count / data_frame_entry.partitions;
 	const uint64_t remainder_count = data_frame_entry.row_count % data_frame_entry.partitions;
 
-
 	auto byte_iter = reinterpret_cast<const std::byte*>(data);
 	const auto byte_end_iter = std::next(byte_iter, static_cast<std::iter_difference_t<const uint8_t*>>(size));
 	while(byte_iter != byte_end_iter)
@@ -131,19 +130,19 @@ uint64_t StorageService::append_to_data_frame(const herd::common::UUID& session_
 
 		while(byte_iter != byte_end_iter)
 		{
-			if(upload_state.rows_stored_in_partition == max_rows_in_partition)
-			{
-				upload_state.current_partition += 1;
-				upload_state.rows_stored_in_partition = 0;
-				break;
-			}
-
 			const auto row_size = next_row_size(std::span(byte_iter, byte_end_iter));
 			append_to_file(output, reinterpret_cast<const uint8_t*>(byte_iter), row_size);
 			std::advance(byte_iter, row_size);
 
 			++upload_state.rows_stored_in_partition;
 			++rows_read;
+
+			if(upload_state.rows_stored_in_partition == max_rows_in_partition)
+			{
+				upload_state.current_partition += 1;
+				upload_state.rows_stored_in_partition = 0;
+				break;
+			}
 		}
 	}
 
@@ -248,7 +247,7 @@ std::ofstream StorageService::open_chunk_file(const herd::common::UUID& session_
 		spdlog::info("Created new chunk: {} for session: {}, data frame: {}", chunk_name, session_uuid.as_string(), uuid.as_string());
 	}
 
-	return {data_frame_chunk_path, std::ios_base::binary | std::ios_base::ate};
+	return {data_frame_chunk_path, std::ios_base::binary | std::ios_base::app};
 }
 
 void StorageService::mark_data_frame_as_uploaded(const herd::common::UUID& session_uuid, const herd::common::UUID& uuid)
