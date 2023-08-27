@@ -63,7 +63,7 @@ namespace
 		Config::SecurityConfig security_config;
 
 		security_config.secret_key = get_value<std::string>(node, "secret_key");
-		security_config.token_lifetime = get_optional_value<uint64_t>(node, "token_lifetime", 3600);
+		security_config.token_lifetime = get_optional_value<uint64_t>(node, "token_lifetime", 12 * 60 * 60);
 
 		if(const auto ssl_node = node["ssl"]; ssl_node)
 		{
