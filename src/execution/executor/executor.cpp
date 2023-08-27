@@ -126,6 +126,12 @@ namespace executor
 		{
 			execution_service_.mark_task_completed(event.key);
 			--pending_job_count_;
+
+			spdlog::debug("Task marked as completed successfully: {}:{} {}:{}",
+						  event.key.session_uuid.as_string(),
+						  event.key.job_uuid.as_string(),
+						  event.key.stage_node_id,
+						  event.key.part);
 		}
 		else if(event.status == IWorkerGroup::TaskHandle::Status::TIME_OUT)
 		{
@@ -140,15 +146,35 @@ namespace executor
 			{
 				schedule_task_on_worker(event.key);
 				++retry_counter_[event.key];
+				spdlog::debug("Task timeouted(retrying): {}:{} {}:{}",
+							  event.key.session_uuid.as_string(),
+							  event.key.job_uuid.as_string(),
+							  event.key.stage_node_id,
+							  event.key.part);
 			}
 			else
 			{
 				execution_service_.mark_task_failed(event.key);
+				--pending_job_count_;
+
+				spdlog::debug("Task failed after {} retries: {}:{} {}:{}",
+							  RETRY_LIMIT,
+							  event.key.session_uuid.as_string(),
+							  event.key.job_uuid.as_string(),
+							  event.key.stage_node_id,
+							  event.key.part);
 			}
 		}
 		else if(event.status == IWorkerGroup::TaskHandle::Status::ERROR)
 		{
 			execution_service_.mark_task_failed(event.key);
+			--pending_job_count_;
+
+			spdlog::debug("Task failed: {}:{} {}:{}",
+						  event.key.session_uuid.as_string(),
+						  event.key.job_uuid.as_string(),
+						  event.key.stage_node_id,
+						  event.key.part);
 		}
 
 		schedule_tasks_on_workers();

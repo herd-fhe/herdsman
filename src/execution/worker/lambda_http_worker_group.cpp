@@ -12,7 +12,7 @@ void LambdaWorkerGroup::LambdaWorkerGroupTaskHandle::mark_completed()
 	long response_code = 0;
 	curl_easy_getinfo(http_handle_, CURLINFO_RESPONSE_CODE, &response_code);
 
-	status_ = response_code == 200 ? Status::COMPLETED : Status::ERROR;
+	status_ = response_code == 200 ? Status::COMPLETED : Status::TIME_OUT;
 
 	curl_easy_cleanup(http_handle_);
 	curl_slist_free_all(headers_);
@@ -160,6 +160,8 @@ void LambdaWorkerGroup::thread_body(LambdaWorkerGroup& worker_group)
 			{
 				auto handle = worker_group.handle_queue_.front();
 				worker_group.handle_queue_.pop();
+
+				spdlog::debug("Scheduling new task");
 
 				curl_multi_add_handle(worker_group.multi_handle_, handle->http_handle_);
 				worker_group.statuses_.try_emplace(handle->http_handle_, handle);

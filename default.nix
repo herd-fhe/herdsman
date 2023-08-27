@@ -9,7 +9,7 @@ with pkgs;
 
 gcc13Stdenv.mkDerivation rec {
     pname = "herdsman";
-    version = "0.0.2";
+    version = "0.0.8";
     src = ./.;
 
     nativeBuildInputs = [
