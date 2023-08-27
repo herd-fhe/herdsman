@@ -146,6 +146,10 @@ namespace executor
 				execution_service_.mark_task_failed(event.key);
 			}
 		}
+		else if(event.status == IWorkerGroup::TaskHandle::Status::ERROR)
+		{
+			execution_service_.mark_task_failed(event.key);
+		}
 
 		schedule_tasks_on_workers();
 	}
