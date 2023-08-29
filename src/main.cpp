@@ -131,6 +131,9 @@ int main()
 	grpc::ServerBuilder builder;
 	builder.AddListeningPort(address, credentials);
 
+	builder.SetMaxSendMessageSize(32 * 1024 * 1024);
+	builder.SetMaxReceiveMessageSize(32 * 1024 * 1024);
+
 	AuthController auth_controller(auth_service);
 	builder.RegisterService(&auth_controller);
 	spdlog::debug("Auth controller created");

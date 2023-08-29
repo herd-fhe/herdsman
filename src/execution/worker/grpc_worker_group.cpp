@@ -15,10 +15,15 @@ GrpcWorkerGroup::GrpcWorkerGroup(const std::vector<Address>& worker_addresses)
 	workers_.reserve(worker_addresses.size());
 	spdlog::info("Discovered {} workers", worker_addresses.size());
 
+	grpc::ChannelArguments channel_arguments;
+	channel_arguments.SetMaxSendMessageSize(32 * 1024 * 1024);
+	channel_arguments.SetMaxReceiveMessageSize(32 * 1024 * 1024);
+
 	for(auto& address: worker_addresses)
 	{
 		const auto address_str = address.hostname + ":" + std::to_string(address.port);
-		auto channel = grpc::CreateChannel(address_str, grpc::InsecureChannelCredentials());
+
+		auto channel = grpc::CreateCustomChannel(address_str, grpc::InsecureChannelCredentials(), channel_arguments);
 		auto stub = herd::proto::Worker::NewStub(channel);
 		workers_.emplace_back(channel, std::move(stub));
 		spdlog::info("Worker: grpc - {}", address_str);
