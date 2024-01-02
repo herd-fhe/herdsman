@@ -88,6 +88,58 @@ namespace
 			return "";
 		}
 	}
+
+
+	int trace([[maybe_unused]] CURL* curl_handle, curl_infotype type, [[maybe_unused]] char* data, [[maybe_unused]] size_t size, [[maybe_unused]] void* userp)
+	{
+		spdlog::debug("Call id: {} ", curl_handle);
+
+		switch(type)
+		{
+			case CURLINFO_TEXT:
+			{
+				spdlog::debug("== Info: {}", data);
+				break;
+			}
+			case CURLINFO_HEADER_OUT:
+			{
+				spdlog::debug("=> Header");
+				break;
+			}
+			case CURLINFO_DATA_OUT:
+			{
+				spdlog::debug("=> Data");
+				break;
+			}
+			case CURLINFO_SSL_DATA_OUT:
+			{
+				spdlog::debug("=> SSL Data");
+				break;
+			}
+			case CURLINFO_HEADER_IN:
+			{
+				spdlog::debug("<= Header");
+				break;
+			}
+			case CURLINFO_DATA_IN:
+			{
+				spdlog::debug("<= Data");
+				break;
+			}
+			case CURLINFO_SSL_DATA_IN:
+			{
+				spdlog::debug("<= SSL Data");
+				break;
+			}
+			case CURLINFO_END:
+			{
+				spdlog::debug("End");
+				break;
+			}
+		}
+
+		return 0;
+	}
 }
 
 LambdaWorkerGroup::LambdaWorkerGroup(const Address& lambda_address, std::size_t concurrency_limit)
@@ -111,24 +163,29 @@ LambdaWorkerGroup::LambdaWorkerGroup(const Address& lambda_address, std::size_t 
 
 void LambdaWorkerGroup::thread_body(LambdaWorkerGroup& worker_group)
 {
+	spdlog::info("Lambda worker group - background worker starting...");
 	while(true)
 	{
 		if(worker_group.closed_.test())
 		{
+			spdlog::info("Lambda worker group - background worker stopping...");
 			return;
 		}
 
 		{
 			int running = 0;
 
+			spdlog::debug("Passing execution to curl perform");
 			if(curl_multi_perform(worker_group.multi_handle_, &running))
 			{
 				spdlog::error("Lambda worker - Perform. Internal error");
 				return;
 			}
 
+			spdlog::debug("Execution returned from curl perform");
 			spdlog::debug("Lambda worker - {} calls in progress", running);
 
+			spdlog::debug("Waiting for events");
 			if(curl_multi_poll(worker_group.multi_handle_, nullptr, 0, 5000, nullptr))
 			{
 				spdlog::error("Lambda worker - Poll. Internal error");
@@ -181,6 +238,8 @@ std::shared_ptr<IWorkerGroup::TaskHandle> LambdaWorkerGroup::schedule_task(const
 	curl_easy_setopt(handle, CURLOPT_URL, url.c_str());
 
 	curl_easy_setopt(handle, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(handle, CURLOPT_DEBUGFUNCTION, trace);
+	curl_easy_setopt(handle, CURLOPT_VERBOSE, 1L);
 
 	{
 		const auto payload = build_task_payload(task);
@@ -196,6 +255,8 @@ std::shared_ptr<IWorkerGroup::TaskHandle> LambdaWorkerGroup::schedule_task(const
 		std::unique_lock lock(queue_mutex_);
 		handle_queue_.push(task_handle);
 	}
+
+	spdlog::debug("New call scheduled with id: {}", handle);
 
 	return task_handle;
 }
