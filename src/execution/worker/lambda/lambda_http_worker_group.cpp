@@ -228,7 +228,9 @@ void LambdaWorkerGroup::thread_body(LambdaWorkerGroup& worker_group)
 				}
 			}
 
+			spdlog::debug("Scanning storage directory");
 			const auto new_files = worker_group.watch_.detect_changes();
+			spdlog::debug("{} new files found", new_files.size());
 			for(const auto& new_file: new_files)
 			{
 				const auto& status = worker_group.statuses_by_outpath_[new_file];
