@@ -1,4 +1,4 @@
-#include "execution/worker/lambda_http_worker_group.hpp"
+#include "execution/worker/lambda/lambda_http_worker_group.hpp"
 
 #include <curl/multi.h>
 #include <nlohmann/json.hpp>
@@ -29,9 +29,14 @@ IWorkerGroup::TaskHandle::Status LambdaWorkerGroup::LambdaWorkerGroupTaskHandle:
 	return status_;
 }
 
+const std::filesystem::path& LambdaWorkerGroup::LambdaWorkerGroupTaskHandle::outpath() const noexcept
+{
+	return outpath_;
+}
+
 namespace
 {
-	std::string build_map_payload(const herd::common::MapTask& map_task)
+	std::pair<std::string, std::filesystem::path> build_map_payload(const herd::common::MapTask& map_task)
 	{
 		nlohmann::json payload;
 		payload["type"] = "MAP";
@@ -47,10 +52,16 @@ namespace
 
 			payload["data"] = data_array;
 		}
-		return payload.dump();
+
+		const auto relative_result_path =
+			std::filesystem::path(map_task.session_uuid.as_string())
+			/ map_task.output_data_frame_ptr.uuid.as_string()
+			/ std::to_string(map_task.output_data_frame_ptr.partition);
+
+		return std::make_pair(payload.dump(), relative_result_path);
 	}
 
-	std::string build_reduce_payload(const herd::common::ReduceTask& reduce_task)
+	std::pair<std::string, std::filesystem::path> build_reduce_payload(const herd::common::ReduceTask& reduce_task)
 	{
 		nlohmann::json payload;
 		payload["type"] = "REDUCE";
@@ -67,10 +78,15 @@ namespace
 			payload["data"] = data_array;
 		}
 
-		return payload.dump();
+		const auto relative_result_path =
+			std::filesystem::path(reduce_task.session_uuid.as_string())
+			/ reduce_task.output_data_frame_ptr.uuid.as_string()
+			/ std::to_string(reduce_task.output_data_frame_ptr.partition);
+
+		return std::make_pair(payload.dump(), relative_result_path);
 	}
 
-	std::string build_task_payload(const herd::common::task_t& task)
+	std::pair<std::string, std::filesystem::path> build_task_payload(const herd::common::task_t& task)
 	{
 		if(std::holds_alternative<herd::common::MapTask>(task))
 		{
@@ -85,7 +101,7 @@ namespace
 		else
 		{
 			assert(false && "Unsupported payload type");
-			return "";
+			return std::pair<std::string, std::filesystem::path>();
 		}
 	}
 
@@ -142,8 +158,8 @@ namespace
 	}
 }
 
-LambdaWorkerGroup::LambdaWorkerGroup(const Address& lambda_address, std::size_t concurrency_limit)
-	: lambda_address_(lambda_address), concurrency_limit_(concurrency_limit)
+LambdaWorkerGroup::LambdaWorkerGroup(const Address& lambda_address, std::size_t concurrency_limit, const std::filesystem::path& storage_dir)
+	: lambda_address_(lambda_address), concurrency_limit_(concurrency_limit), storage_dir_(storage_dir)
 {
 	spdlog::debug("Initializing curl");
 	if(curl_global_init(CURL_GLOBAL_ALL)) {
@@ -199,14 +215,31 @@ void LambdaWorkerGroup::thread_body(LambdaWorkerGroup& worker_group)
 				if(message->msg == CURLMSG_DONE)
 				{
 					const auto& handle = message->easy_handle;
-					const auto& status = worker_group.statuses_[handle];
+					const auto& status = worker_group.statuses_by_handle_[handle];
 
 					curl_multi_remove_handle(worker_group.multi_handle_, handle);
 
 					status->mark_completed();
 
-					worker_group.statuses_.erase(handle);
+					worker_group.watch_.unwatch(status->outpath());
+
+					worker_group.statuses_by_outpath_.erase(status->outpath());
+					worker_group.statuses_by_handle_.erase(handle);
 				}
+			}
+
+			const auto new_files = worker_group.watch_.detect_changes();
+			for(const auto& new_file: new_files)
+			{
+				const auto& status = worker_group.statuses_by_outpath_[new_file];
+				const auto handle = status->http_handle_;
+
+				curl_multi_remove_handle(worker_group.multi_handle_, handle);
+
+				status->mark_completed();
+
+				worker_group.statuses_by_outpath_.erase(status->outpath());
+				worker_group.statuses_by_handle_.erase(handle);
 			}
 		}
 
@@ -221,7 +254,10 @@ void LambdaWorkerGroup::thread_body(LambdaWorkerGroup& worker_group)
 				spdlog::debug("Scheduling new task");
 
 				curl_multi_add_handle(worker_group.multi_handle_, handle->http_handle_);
-				worker_group.statuses_.try_emplace(handle->http_handle_, handle);
+				worker_group.statuses_by_handle_.try_emplace(handle->http_handle_, handle);
+				worker_group.statuses_by_outpath_.try_emplace(handle->outpath(), handle);
+
+				worker_group.watch_.watch_for(handle->outpath());
 			}
 		}
 	}
@@ -241,12 +277,14 @@ std::shared_ptr<IWorkerGroup::TaskHandle> LambdaWorkerGroup::schedule_task(const
 	curl_easy_setopt(handle, CURLOPT_DEBUGFUNCTION, trace);
 	curl_easy_setopt(handle, CURLOPT_VERBOSE, 1L);
 
-	{
-		const auto payload = build_task_payload(task);
-		curl_easy_setopt(handle, CURLOPT_COPYPOSTFIELDS, payload.data());
-	}
-
 	auto task_handle = std::make_shared<LambdaWorkerGroupTaskHandle>();
+
+	{
+		const auto [payload, target_file] = build_task_payload(task);
+		curl_easy_setopt(handle, CURLOPT_COPYPOSTFIELDS, payload.data());
+
+		task_handle->outpath_ = storage_dir_ / target_file;
+	}
 
 	task_handle->headers_ = headers;
 	task_handle->http_handle_ = handle;

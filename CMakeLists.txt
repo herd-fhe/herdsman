@@ -140,8 +140,11 @@ target_sources(
         src/service/execution_service.cpp
 
         src/execution/worker/i_worker_group.cpp
-        src/execution/worker/grpc_worker_group.cpp
-        src/execution/worker/lambda_http_worker_group.cpp
+
+        src/execution/worker/grpc/grpc_worker_group.cpp
+
+        src/execution/worker/lambda/lambda_http_worker_group.cpp
+        src/execution/worker/lambda/filesystem_watch.cpp
 
         src/plugins/token_auth_metadata_processor.cpp
 
@@ -172,8 +175,11 @@ target_sources(
         include/service/execution_service.hpp
 
         include/execution/worker/i_worker_group.hpp
-        include/execution/worker/grpc_worker_group.hpp
-        include/execution/worker/lambda_http_worker_group.hpp
+
+        include/execution/worker/grpc/grpc_worker_group.hpp
+
+        include/execution/worker/lambda/lambda_http_worker_group.hpp
+        include/execution/worker/lambda/filesystem_watch.hpp
 
         include/service/common_exceptions.hpp
 

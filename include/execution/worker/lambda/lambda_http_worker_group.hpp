@@ -5,8 +5,10 @@
 
 #include <thread>
 #include <queue>
+#include <filesystem>
 
 #include "execution/worker/i_worker_group.hpp"
+#include "filesystem_watch.hpp"
 
 #include "utils/address.hpp"
 
@@ -18,6 +20,7 @@ public:
 	{
 	public:
 		Status status() const noexcept override;
+		[[nodiscard]] const std::filesystem::path& outpath() const noexcept;
 
 	private:
 		friend class LambdaWorkerGroup;
@@ -27,11 +30,13 @@ public:
 		CURL* http_handle_ = nullptr;
 		struct curl_slist* headers_ = nullptr;
 
+		std::filesystem::path outpath_{};
+
 		void mark_completed() override;
 	};
 
-	LambdaWorkerGroup(const Address& lambda_url, std::size_t concurrency_limit);
-	~LambdaWorkerGroup();
+	LambdaWorkerGroup(const Address& lambda_url, std::size_t concurrency_limit, const std::filesystem::path& storage_dir);
+	~LambdaWorkerGroup() override;
 
 	std::shared_ptr<TaskHandle> schedule_task(const herd::common::task_t& task) override;
 	size_t concurrent_workers() const noexcept override;
@@ -42,11 +47,15 @@ private:
 
 	Address lambda_address_;
 	std::size_t concurrency_limit_ = 1;
+	std::filesystem::path storage_dir_;
 
 	std::mutex queue_mutex_;
 	std::queue<std::shared_ptr<LambdaWorkerGroupTaskHandle>> handle_queue_;
 
-	std::unordered_map<void*, std::shared_ptr<LambdaWorkerGroupTaskHandle>> statuses_;
+	FilesystemWatch watch_;
+
+	std::unordered_map<void*, std::shared_ptr<LambdaWorkerGroupTaskHandle>> statuses_by_handle_;
+	std::unordered_map<std::filesystem::path, std::shared_ptr<LambdaWorkerGroupTaskHandle>> statuses_by_outpath_;
 
 	CURLM* multi_handle_;
 
