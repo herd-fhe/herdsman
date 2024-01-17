@@ -21,6 +21,7 @@ public:
 	public:
 		Status status() const noexcept override;
 		[[nodiscard]] const std::filesystem::path& outpath() const noexcept;
+		void override_success() noexcept;
 
 	private:
 		friend class LambdaWorkerGroup;
@@ -33,6 +34,8 @@ public:
 		std::filesystem::path outpath_{};
 
 		void mark_completed() override;
+
+		bool sucess_override_ = false;
 	};
 
 	LambdaWorkerGroup(const Address& lambda_url, std::size_t concurrency_limit, const std::filesystem::path& storage_dir);

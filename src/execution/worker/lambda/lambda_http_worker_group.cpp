@@ -9,17 +9,25 @@
 
 void LambdaWorkerGroup::LambdaWorkerGroupTaskHandle::mark_completed()
 {
-	long response_code = 0;
-	curl_easy_getinfo(http_handle_, CURLINFO_RESPONSE_CODE, &response_code);
+	if (sucess_override_)
+	{
+		status_ = Status::COMPLETED;
+		spdlog::info("Worker completed execution with file observed");
+	}
+	else
+	{
+		long response_code = 0;
+		curl_easy_getinfo(http_handle_, CURLINFO_RESPONSE_CODE, &response_code);
 
-	status_ = response_code == 200 ? Status::COMPLETED : Status::TIME_OUT;
+		status_ = response_code == 200 ? Status::COMPLETED : Status::TIME_OUT;
+		spdlog::info("Worker completed execution with status: {} {}", response_code, response_code == 200 ? "OK" : "NOT OK");
+	}
 
 	curl_easy_cleanup(http_handle_);
 	curl_slist_free_all(headers_);
 	headers_ = nullptr;
 	http_handle_ = nullptr;
 
-	spdlog::info("Worker completed execution with status: {} {}", response_code, response_code == 200 ? "OK" : "NOT OK");
 
 	TaskHandle::mark_completed();
 }
@@ -32,6 +40,11 @@ IWorkerGroup::TaskHandle::Status LambdaWorkerGroup::LambdaWorkerGroupTaskHandle:
 const std::filesystem::path& LambdaWorkerGroup::LambdaWorkerGroupTaskHandle::outpath() const noexcept
 {
 	return outpath_;
+}
+
+void LambdaWorkerGroup::LambdaWorkerGroupTaskHandle::override_success() noexcept
+{
+	sucess_override_ = true;
 }
 
 namespace
@@ -238,6 +251,7 @@ void LambdaWorkerGroup::thread_body(LambdaWorkerGroup& worker_group)
 
 				curl_multi_remove_handle(worker_group.multi_handle_, handle);
 
+				status->override_success();
 				status->mark_completed();
 
 				worker_group.statuses_by_outpath_.erase(status->outpath());
