@@ -7,7 +7,7 @@ void FilesystemWatch::watch_for(const std::filesystem::path& file_to_watch)
 
 	watched_files_by_directories_.emplace(base_directory, file_to_watch);
 
-	directory_modify_time_.try_emplace(file_to_watch, std::filesystem::file_time_type());
+	directory_modify_time_.try_emplace(base_directory, std::filesystem::file_time_type());
 }
 
 void FilesystemWatch::unwatch(const std::filesystem::path& file_to_unwatch)
@@ -34,7 +34,7 @@ std::vector<std::filesystem::path> FilesystemWatch::detect_changes()
 {
 	std::vector<std::filesystem::path> new_files;
 
-	for(auto dir_iter = std::begin(directory_modify_time_); dir_iter != std::end(directory_modify_time_); ++dir_iter)
+	for(auto dir_iter = std::begin(directory_modify_time_); dir_iter != std::end(directory_modify_time_);)
 	{
 		const auto& dir = dir_iter->first;
 
@@ -43,7 +43,7 @@ std::vector<std::filesystem::path> FilesystemWatch::detect_changes()
 		{
 			dir_iter->second = new_modify_time;
 			auto [iter, end] = watched_files_by_directories_.equal_range(dir);
-			for(;iter != end; ++iter)
+			for(;iter != end;)
 			{
 				if(std::filesystem::exists(iter->second))
 				{
@@ -51,13 +51,20 @@ std::vector<std::filesystem::path> FilesystemWatch::detect_changes()
 
 					iter = watched_files_by_directories_.erase(iter);
 				}
+				else
+				{
+					++iter;
+				}
 			}
 
 			if (!watched_files_by_directories_.contains(dir))
 			{
 				dir_iter = directory_modify_time_.erase(dir_iter);
+				continue;
 			}
 		}
+
+		++dir_iter;
 	}
 
 	return new_files;
