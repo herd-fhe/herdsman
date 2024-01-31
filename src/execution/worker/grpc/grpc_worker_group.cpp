@@ -1,4 +1,4 @@
-#include "execution/worker/grpc_worker_group.hpp"
+#include "execution/worker/grpc/grpc_worker_group.hpp"
 
 #include "herd/mapper/worker.hpp"
 #include "spdlog/spdlog.h"
