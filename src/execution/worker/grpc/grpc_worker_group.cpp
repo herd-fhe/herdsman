@@ -71,6 +71,8 @@ std::shared_ptr<IWorkerGroup::TaskHandle> GrpcWorkerGroup::schedule_task(const h
 {
 	std::unique_lock lock(status_mutex_);
 
+	assert(!std::holds_alternative<std::monostate>(task));
+
 	auto& worker = workers_[current_worker_];
 
 	auto handle = std::make_shared<GrpcTaskHandle>();

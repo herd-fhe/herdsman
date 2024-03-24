@@ -30,16 +30,14 @@ public:
 		enum class State
 		{
 			WAITING,
-			BLOCKED,
 			PENDING,
-			COMPLETED,
-			FAILED
 		};
-		uint32_t partition;
+		uint32_t key;
 		State state;
 
 		StageTask(uint32_t task_partition, State task_state=State::WAITING)
-		:	partition(task_partition), state(task_state)
+		:
+			key(task_partition), state(task_state)
 		{};
 	};
 
@@ -50,41 +48,108 @@ public:
 
 	using stage_state_t = std::variant<std::monostate, ReduceStageState>;
 
-	struct StageProgress
-	{
-		herd::common::DAG<herd::common::stage_t>::Node<true> stage_node;
-		std::tuple<herd::common::UUID, uint64_t, uint32_t> stage_output;
+	struct JobDescriptor;
 
-		std::vector<StageTask> pending_tasks;
+	class BaseStageProgress
+	{
+	public:
+		BaseStageProgress(herd::common::DAG<herd::common::stage_t>::Node<true> stage_node,
+						  ExecutionService::JobDescriptor& job_descriptor,
+						  ExecutionService& execution_service)
+			: stage_node_(std::move(stage_node)), job_(job_descriptor), execution_service_(execution_service)
+		{}
+
+		virtual void mark_task_completed(uint32_t task_key);
+		void mark_task_running(uint32_t task_key);
+
+		std::optional<TaskKey> get_next_for_execution();
+
+		virtual herd::common::task_t build_task(const TaskKey& key) const;
+
+		std::tuple<herd::common::UUID, uint64_t, uint32_t> stage_output() const;
+		bool is_completed() const;
+
+		virtual ~BaseStageProgress() = default;
+
+	protected:
+		herd::common::DAG<herd::common::stage_t>::Node<true> stage_node_;
+		ExecutionService::JobDescriptor& job_;
+		ExecutionService& execution_service_;
+
+		std::tuple<herd::common::UUID, uint64_t, uint32_t> stage_output_;
+
+		std::vector<StageTask> pending_tasks_;
 
 		stage_state_t state;
+	};
 
-		StageProgress(
-				herd::common::DAG<herd::common::stage_t>::Node<true> progress_stage_node,
-				std::tuple<herd::common::UUID, uint64_t, uint32_t> progress_stage_output,
-				stage_state_t progress_state
-		)
-		: stage_node(std::move(progress_stage_node)), stage_output(std::move(progress_stage_output)), state(std::move(progress_state))
-		{}
+	class InputStageProgress: public BaseStageProgress
+	{
+	public:
+		InputStageProgress(herd::common::DAG<herd::common::stage_t>::Node<true> stage_node,
+							ExecutionService::JobDescriptor& job_descriptor,
+							ExecutionService& execution_service);
+	};
+
+	class OutputStageProgress: public BaseStageProgress
+	{
+	public:
+		OutputStageProgress(herd::common::DAG<herd::common::stage_t>::Node<true> stage_node,
+						   ExecutionService::JobDescriptor& job_descriptor,
+						   ExecutionService& execution_service);
+	};
+
+	class MapperStageProgress: public BaseStageProgress
+	{
+	public:
+		MapperStageProgress(herd::common::DAG<herd::common::stage_t>::Node<true> stage_node,
+							ExecutionService::JobDescriptor& job_descriptor,
+							ExecutionService& execution_service);
+
+		herd::common::task_t build_task(const TaskKey& key) const override;
+	};
+
+	class ReduceStageProgress: public BaseStageProgress
+	{
+	public:
+		ReduceStageProgress(herd::common::DAG<herd::common::stage_t>::Node<true> stage_node,
+							ExecutionService::JobDescriptor& job_descriptor,
+							ExecutionService& execution_service);
+
+		void mark_task_completed(uint32_t task_key) override;
+
+		herd::common::task_t build_task(const TaskKey& key) const override;
+
+	private:
+		struct ReduceNode
+		{
+			std::tuple<herd::common::UUID, uint64_t, uint32_t> stage_output_;
+			std::size_t unresolved_dependencies;
+		};
+
+		herd::common::DAG<ReduceNode> reduce_tree_;
 	};
 
 	struct JobDescriptor
 	{
 		JobDescriptor(
-				const herd::common::UUID& job_uuid,
+				const herd::common::UUID& session,
+				const herd::common::UUID& job,
 				herd::common::JobStatus job_status,
 				herd::common::ExecutionPlan job_plan,
 				std::size_t job_concurrency_limit)
-		: 	uuid(job_uuid),
+		: 	session_uuid(session),
+			job_uuid(job),
 			status(job_status),
 			plan(std::move(job_plan)),
 			concurrency_limit(job_concurrency_limit)
 		{}
 
-		herd::common::UUID uuid;
+		herd::common::UUID session_uuid;
+		herd::common::UUID job_uuid;
 		std::vector<std::size_t> pending_stage_ids{};
 		std::unordered_map<std::size_t, std::size_t> dependency_lookup;
-		std::map<std::size_t, StageProgress> stage_progress{};
+		std::map<std::size_t, std::unique_ptr<BaseStageProgress>> stage_progress{};
 		herd::common::JobStatus status;
 
 		herd::common::ExecutionPlan plan;
@@ -112,16 +177,16 @@ public:
 	JobExecutionState get_job_state(const herd::common::UUID& session_uuid, const herd::common::UUID& job_uuid);
 	std::vector<JobExecutionState> get_job_states_for_session(const herd::common::UUID& session_uuid);
 
-	JobDescription get_job_description(const herd::common::UUID& session_uuid, const herd::common::UUID& job_uuid);
-
 	void set_executor(std::shared_ptr<executor::IExecutor> executor) noexcept;
 
 	[[nodiscard]] std::optional<TaskKey> get_next_for_execution();
-	void mark_task_running(TaskKey key);
+	void mark_task_running(TaskKey task_key);
 	[[nodiscard]] herd::common::task_t task_for_task_key(const TaskKey& key) const;
 
-	void mark_task_completed(const TaskKey& key);
+	void mark_task_completed(const TaskKey& task_key);
 	void mark_task_failed(const TaskKey& key);
+
+	StorageService& storage_service();
 
 private:
 	KeyService& key_service_;
@@ -130,7 +195,7 @@ private:
 	mutable std::shared_mutex jobs_mutex_;
 	std::condition_variable jobs_cv_;
 
-	std::queue<std::pair<herd::common::UUID, std::shared_ptr<JobDescriptor>>> pending_jobs_;
+	std::queue<std::shared_ptr<JobDescriptor>> pending_jobs_;
 	std::multimap<herd::common::UUID, std::shared_ptr<JobDescriptor>> job_descriptors_;
 
 	std::shared_ptr<executor::IExecutor> executor_;
@@ -138,31 +203,12 @@ private:
 	void lock_required_resources(const herd::common::UUID& session_uuid, const execution_plan::ResourceRequirements& requirements);
 	const JobDescriptor& get_job_descriptor(const herd::common::UUID& session_uuid, const herd::common::UUID& job_uuid) const;
 	JobDescriptor& get_job_descriptor(const herd::common::UUID& session_uuid, const herd::common::UUID& job_uuid);
-	StageTask& get_task(JobDescriptor& descriptor, std::size_t stage_node_id, uint32_t partition);
 
-	void initialize_job(const herd::common::UUID& dependant_node, ExecutionService::JobDescriptor& descriptor);
-	void initialize_input_stage(
-			const herd::common::DAG<herd::common::stage_t>::Node<true>& stage_node,
-			ExecutionService::JobDescriptor& descriptor, const herd::common::UUID& session_uuid
-	);
-	void initialize_output_stage(
-			const herd::common::DAG<herd::common::stage_t>::Node<true>& stage_node,
-			ExecutionService::JobDescriptor& descriptor
-	);
-	void initialize_map_stage(
-			const herd::common::DAG<herd::common::stage_t>::Node<true>& stage_node,
-			ExecutionService::JobDescriptor& descriptor, const herd::common::UUID& session_uuid
-	);
-	void initialize_reduce_stage(
-			const herd::common::DAG<herd::common::stage_t>::Node<true>& stage_node,
-			ExecutionService::JobDescriptor& descriptor, const herd::common::UUID& session_uuid
-	);
+	void initialize_job(ExecutionService::JobDescriptor& descriptor);
 
-	void recalculate_waiting_tasks(JobDescriptor& descriptor);
+	void recalculate_available_stages(ExecutionService::JobDescriptor& descriptor);
 
 	herd::common::task_t prepare_task(const JobDescriptor& descriptor, const TaskKey& key) const;
-	herd::common::task_t build_map_task(const JobDescriptor& descriptor, const TaskKey& key) const;
-	herd::common::task_t build_reduce_task(const JobDescriptor& descriptor, const TaskKey& key) const;
 };
 
 #endif //HERDSMAN_EXECUTION_SERVICE_HPP

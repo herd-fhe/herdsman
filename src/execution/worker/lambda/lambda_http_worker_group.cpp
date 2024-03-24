@@ -281,6 +281,8 @@ void LambdaWorkerGroup::thread_body(LambdaWorkerGroup& worker_group)
 
 std::shared_ptr<IWorkerGroup::TaskHandle> LambdaWorkerGroup::schedule_task(const herd::common::task_t& task)
 {
+	assert(!std::holds_alternative<std::monostate>(task));
+
 	CURL* handle = curl_easy_init();
 
 	struct curl_slist* headers = nullptr;

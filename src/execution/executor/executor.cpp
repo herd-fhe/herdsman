@@ -127,7 +127,7 @@ namespace executor
 			execution_service_.mark_task_completed(event.key);
 			--pending_job_count_;
 
-			spdlog::debug("Task marked as completed successfully: {}:{} {}:{}",
+			spdlog::debug("Task marked as is_completed successfully: {}:{} {}:{}",
 						  event.key.session_uuid.as_string(),
 						  event.key.job_uuid.as_string(),
 						  event.key.stage_node_id,
